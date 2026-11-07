@@ -1,0 +1,25 @@
+# Copy to %LOCALAPPDATA%\PilotPatch\config.yaml or select with --config.
+# Do not trust configuration supplied by the target repository.
+provider: copilot_browser
+permission_mode: approve
+max_steps: 40
+format_retries: 2
+max_file_bytes: 64000
+max_context_bytes: 48000
+max_response_bytes: 100000
+max_output_bytes: 16000
+command_timeout: 120
+response_timeout: 180
+stable_seconds: 3.0
+poll_seconds: 0.5
+retention_days: 30
+proxy_server: null
+# Exact argv lists only. Empty means ask for every command.
+allowed_commands: []
+# These commands run without another approval, except in read-only mode.
+# Tests execute repository code with your Windows user permissions.
+test_commands: {}
+# Example, after operator review:
+# test_commands:
+#   unit: ['C:\Work\MyApp\.venv\Scripts\python.exe', '-m', 'pytest', '-q']
+# Selector defaults can be overridden individually under selectors:.
