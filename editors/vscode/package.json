@@ -1,0 +1,43 @@
+{
+  "name": "pilotpatch",
+  "displayName": "PilotPatch",
+  "description": "Prompt your workspace through the local Microsoft Copilot Web-only PilotPatch harness.",
+  "version": "0.1.0",
+  "publisher": "pilotpatch-local",
+  "license": "MIT",
+  "engines": {"vscode": "^1.85.0"},
+  "categories": ["Other"],
+  "extensionKind": ["workspace"],
+  "main": "./src/extension.js",
+  "activationEvents": ["onView:pilotpatch.promptView"],
+  "capabilities": {
+    "untrustedWorkspaces": {"supported": false, "description": "PilotPatch runs local code and tools; trust the workspace before running it."},
+    "virtualWorkspaces": {"supported": false, "description": "PilotPatch requires a local filesystem and Microsoft Edge."}
+  },
+  "contributes": {
+    "taskDefinitions": [{"type": "pilotpatch", "required": ["runId"], "properties": {
+      "runId": {"type": "string", "description": "Unique local PilotPatch invocation."}
+    }}],
+    "commands": [
+      {"command": "pilotpatch.open", "title": "PilotPatch: Open Prompt Panel"},
+      {"command": "pilotpatch.configure", "title": "PilotPatch: Select Backend Python"},
+      {"command": "pilotpatch.login", "title": "PilotPatch: Sign In to Microsoft Copilot"},
+      {"command": "pilotpatch.probe", "title": "PilotPatch: Test Copilot Connection"},
+      {"command": "pilotpatch.doctor", "title": "PilotPatch: Check Setup"}
+    ],
+    "viewsContainers": {"activitybar": [{"id": "pilotpatch", "title": "PilotPatch", "icon": "media/pilotpatch.svg"}]},
+    "views": {"pilotpatch": [{"id": "pilotpatch.promptView", "name": "Prompt your project", "type": "webview"}]},
+    "configuration": {
+      "title": "PilotPatch",
+      "properties": {
+        "pilotpatch.pythonPath": {
+          "type": "string", "default": "", "scope": "machine",
+          "description": "Absolute path to the Python executable where PilotPatch is installed (for example PilotPatch/.venv/Scripts/python.exe). Set in User Settings."
+        }
+      }
+    }
+  },
+  "scripts": {"test": "node --test test/*.test.js"},
+  "files": ["src/**", "media/**", "README.md", "LICENSE"],
+  "devDependencies": {}
+}

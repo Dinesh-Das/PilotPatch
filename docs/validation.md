@@ -39,6 +39,30 @@ to the current compatible release, without changing browser security policy.
 - Sample repository test: **1 passed**.
 - Python wheel and source distribution built successfully; a source ZIP is supplied.
 
+## Editor panel follow-up
+
+The dedicated VS Code extension has nine passing Node unit tests and three passing
+real Edge webview tests. The latter cover multiline keyboard submission, permission
+and preview arguments, safe rendering of hostile-looking workspace names, running/
+stopping/error states, and layouts at 320, 768, 1024 and 1440 pixels. No webview
+JavaScript errors were observed. A panel screenshot is generated under `artifacts/`.
+
+Isolated real editor hosts verified extension activation, panel command registration,
+selected workspace, a native ProcessExecution task launching the actual Python
+`doctor`, exit 0, and honest finished-process status in:
+
+- Visual Studio Code 1.141.2.
+- Cursor 3.20.17, exposing VS Code API version 1.128.0.
+
+These editor checks used new test profiles and a known local sample folder, with no
+repository source submitted to a model. The editor's own built-in extension/service
+warnings were separate from PilotPatch. VSIX packaging succeeded and the extension
+was installed in the user's VS Code default profile. Backend Python selection remains
+a visible per-editor User Setting. NPM audit reports zero dependencies/vulnerabilities
+for the extension's dependency-free lockfile. The Python harness is unchanged by
+this editor feature; the full combined Python suite now has 75 tests plus the five
+previously documented skips. Account-bound Copilot validation remains outstanding.
+
 The audit version change was reviewed against the
 [official filelock changelog](https://py-filelock.readthedocs.io/en/latest/changelog.html).
 Windows OS utilities are resolved to System32 and Git must resolve outside the target

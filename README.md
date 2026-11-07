@@ -44,6 +44,32 @@ copilot-agent --project 'C:\Office\Frontend' "Add a reusable table component and
 Alternatively call `D:\MyProjects\PilotPatch\copilot.cmd` by absolute path. Your current
 working directory remains the target repository.
 
+## Prompt from VS Code or Cursor
+
+An optional desktop extension adds a dedicated **PilotPatch** activity-bar panel.
+The panel launches the same Python harness for your selected local workspace; its
+prompts still go exclusively to Microsoft Copilot Web. Source-sharing consent,
+diffs, command approvals and actual output remain in the integrated task terminal.
+
+1. Install `artifacts/pilotpatch-0.1.0.vsix` through **Extensions → … → Install from VSIX…**.
+2. Run **PilotPatch: Open Prompt Panel** from the command palette.
+3. Click **Select backend Python** and select this installation's
+   `.venv\Scripts\python.exe` (for this checkout: `D:\MyProjects\PilotPatch\.venv\Scripts\python.exe`).
+4. Open your target project, use **Sign in** and **Test connection**, then enter a
+   task and choose **Run task**. Ctrl/Cmd+Enter also submits the prompt.
+
+**Permissions** selects approve/read-only/auto-edit; **Preview only** passes dry-run.
+**Change** selects a project in multi-root workspaces. **Stop task** stops only the
+owned editor task; inspect backend session state before resuming partial work.
+The editor's built-in AI chat remains separate. No model API, fallback provider or
+local HTTP server is introduced. Remote/WSL hosts and untrusted workspaces are blocked.
+
+Verified with VS Code 1.141.2 and Cursor 3.20.17 (VS Code API 1.128.0) using real
+extension hosts and an actual backend diagnostic process. Other compatible forks can
+install the same VSIX; compatibility must be checked in the particular fork/version.
+See [editor extension instructions](editors/vscode/README.md) for setup, packaging
+and security details. Node.js is required only for editor-extension development/tests.
+
 ## Account and data destination
 
 `login` opens a dedicated persistent Edge profile. Complete normal Microsoft sign-in

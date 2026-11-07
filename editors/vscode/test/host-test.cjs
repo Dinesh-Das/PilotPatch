@@ -1,0 +1,30 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vscode = require('vscode');
+
+exports.run = async function () {
+  const extension = vscode.extensions.getExtension('pilotpatch-local.pilotpatch');
+  assert.ok(extension, 'PilotPatch must be registered in the actual editor host');
+  const api = await extension.activate();
+  assert.ok(api.controller);
+  assert.equal(vscode.workspace.isTrusted, true);
+  const commands = await vscode.commands.getCommands(true);
+  assert.ok(commands.includes('pilotpatch.open'));
+  await vscode.commands.executeCommand('pilotpatch.open');
+  const exit = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {listener.dispose(); reject(new Error('Diagnostic task did not finish'));}, 60000);
+    const listener = vscode.tasks.onDidEndTaskProcess(event => {
+      if (event.execution.task.definition.type === 'pilotpatch') {
+        clearTimeout(timer); listener.dispose(); resolve(event.exitCode);
+      }
+    });
+  });
+  await api.controller.handle({type: 'doctor'});
+  assert.equal(await exit, 0, 'Real Python doctor task must succeed');
+  assert.equal(api.controller.state.phase, 'finished');
+  const report = {editor: vscode.env.appName, version: vscode.version,
+    activated: true, commandRegistered: true, doctorExitCode: 0,
+    phase: api.controller.state.phase, workspace: api.controller.currentFolder().uri.fsPath};
+  if (process.env.PILOTPATCH_EDITOR_REPORT) fs.writeFileSync(process.env.PILOTPATCH_EDITOR_REPORT, JSON.stringify(report, null, 2));
+};
