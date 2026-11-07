@@ -108,3 +108,12 @@ def test_git_status_diff_exclude_sensitive_content(tmp_path):
     subprocess.run(["git", "init", "-q"], cwd=fs.repo.root, check=True)
     (fs.repo.root / "a.py").write_text("one\n")
     assert "a.py" in fs.repo.git_status()["output"]
+
+
+def test_readonly_git_cannot_execute_project_shadow_binary(tmp_path, monkeypatch):
+    fs = tools(tmp_path)
+    fake = fs.repo.root / "git.exe"
+    fake.write_bytes(b"untrusted executable")
+    monkeypatch.setattr("pilotpatch.tools.repository.shutil.which", lambda _: str(fake))
+    with pytest.raises(ValueError, match="outside"):
+        fs.repo.git_status()

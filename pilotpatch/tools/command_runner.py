@@ -7,6 +7,7 @@ import subprocess
 
 from pilotpatch.security.permissions import Permissions
 from pilotpatch.security.redaction import redact
+from pilotpatch.security.system import windows_binary
 from pilotpatch.tools.repository import Repository
 
 
@@ -20,7 +21,7 @@ class CommandRunner:
         if os.name == "nt":
             # Kill descendants as well, including test workers. PID is a local integer.
             killer = await asyncio.create_subprocess_exec(
-                "taskkill",
+                windows_binary("taskkill.exe"),
                 "/PID",
                 str(process.pid),
                 "/T",
@@ -67,7 +68,7 @@ class CommandRunner:
                     "Batch command contains shell metacharacters; use a direct executable"
                 )
             actual = [
-                os.environ.get("COMSPEC", "cmd.exe"),
+                windows_binary("cmd.exe"),
                 "/d",
                 "/s",
                 "/c",

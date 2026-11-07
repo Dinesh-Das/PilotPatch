@@ -2,6 +2,7 @@ import difflib
 import fnmatch
 import hashlib
 import os
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -161,8 +162,11 @@ class Repository:
         return dict(matches=matches, truncated=False)
 
     def _git(self, arguments: list[str]) -> str:
+        executable = shutil.which("git")
+        if not executable or Path(executable).resolve().is_relative_to(self.root):
+            raise ValueError("Git must be installed outside the untrusted target repository")
         result = subprocess.run(
-            ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", *arguments],
+            [executable, "--no-optional-locks", "-c", "core.fsmonitor=false", *arguments],
             cwd=self.root,
             capture_output=True,
             timeout=15,

@@ -19,7 +19,9 @@ class Selectors(StrictModel):
     user: str = '[data-content="user-message"], [data-testid="user-message"]'
     stop: str = 'button[aria-label="Stop generating"], button[aria-label="Stop responding"]'
     completion: str = 'button[aria-label="Copy"], button[aria-label="Copy message"]'
-    signed_in: str = 'button[aria-label*="Account"], button[aria-label*="Profile"], [data-testid="user-avatar"]'
+    signed_in: str = (
+        'button[aria-label*="Account"], button[aria-label*="Profile"], [data-testid="user-avatar"]'
+    )
     sign_in: str = 'a[href*="login.live.com"], button[aria-label="Sign in"]'
     errors: str = '[role="alert"]'
 

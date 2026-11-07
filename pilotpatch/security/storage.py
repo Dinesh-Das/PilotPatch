@@ -8,15 +8,30 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from pilotpatch.security.system import windows_binary
+
 
 def private_directory(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     if os.name == "nt":
-        identity = subprocess.run(["whoami", "/user", "/fo", "csv", "/nh"],
-                                  capture_output=True, text=True, check=True)
+        identity = subprocess.run(
+            [windows_binary("whoami.exe"), "/user", "/fo", "csv", "/nh"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
         sid = next(csv.reader(io.StringIO(identity.stdout.strip())))[1]
-        subprocess.run(["icacls", str(path), "/inheritance:r", "/grant:r",
-                        f"*{sid}:(OI)(CI)F"], capture_output=True, check=True)
+        subprocess.run(
+            [
+                windows_binary("icacls.exe"),
+                str(path),
+                "/inheritance:r",
+                "/grant:r",
+                f"*{sid}:(OI)(CI)F",
+            ],
+            capture_output=True,
+            check=True,
+        )
     else:
         path.chmod(0o700)
 

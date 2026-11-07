@@ -7,9 +7,20 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 ToolName = Literal[
-    "list_directory", "read_file", "read_file_range", "search_files", "search_content",
-    "git_status", "git_diff", "write_file", "replace_in_file", "apply_patch",
-    "rename_file", "delete_file", "run_tests", "run_command",
+    "list_directory",
+    "read_file",
+    "read_file_range",
+    "search_files",
+    "search_content",
+    "git_status",
+    "git_diff",
+    "write_file",
+    "replace_in_file",
+    "apply_patch",
+    "rename_file",
+    "delete_file",
+    "run_tests",
+    "run_command",
 ]
 
 
@@ -57,10 +68,14 @@ def parse_message(text: str, max_bytes: int = 100000) -> ToolCall | FinalAnswer:
     if fenced:
         stripped = fenced.group(1)
     try:
-        data = json.loads(stripped, object_pairs_hook=_unique_object,
-                          parse_constant=lambda _: (_ for _ in ()).throw(
-                              ProtocolError("Non-finite JSON number")))
+        data = json.loads(
+            stripped,
+            object_pairs_hook=_unique_object,
+            parse_constant=lambda _: (_ for _ in ()).throw(ProtocolError("Non-finite JSON number")),
+        )
         return MESSAGE_ADAPTER.validate_python(data)
     except (ValueError, ValidationError, RecursionError) as exc:
         # Do not echo model/source content into diagnostics.
-        raise ProtocolError("Expected one valid tool_call or final JSON object; see protocol schema") from exc
+        raise ProtocolError(
+            "Expected one valid tool_call or final JSON object; see protocol schema"
+        ) from exc
