@@ -1,5 +1,42 @@
 # Validation report — 8 November 2026
 
+## Existing Edge connection (0.2.0)
+
+Final full suite: **118 passed, 5 skipped**. Ruff checks and formatting, wheel/sdist
+build, installed-wheel asset comparison, `pip check`, and runtime dependency audit
+passed. The audit reported no known vulnerabilities. The five skips remain four
+explicitly gated live-account checks and the Windows symlink-privilege check.
+
+The default now uses a user-installed extension and the explicitly selected Copilot
+tab in the current Edge profile. Development never attached to the user's browser,
+copied a profile, inspected Microsoft credentials or submitted a live model prompt.
+
+The actual Manifest V3 background worker, packaged content script and local Python
+broker were exercised together in headless Chromium with locally fulfilled HTML.
+Cases include multiple turns, old-history isolation, account/guest/service errors,
+preserving an unsent draft, delayed Send controls, navigation interruption, later
+user messages, changing selection, and content-script denial of private pairing storage.
+Transport tests reject wrong key/origin/Host, malformed framing, oversized requests,
+replayed nonces, stale sessions/results, competing tabs and duplicate submissions.
+A replacement listener on the same port could neither authenticate nor read the
+pairing secret or encrypted pending answer. A streaming response cap is tested before
+buffering. A separate model review found no blocking issues after those fixes.
+
+The real popup rendered without JavaScript errors or horizontal overflow; its local
+fixture screenshot is `artifacts/edge-connection-popup.png`. The editor's Connect action
+is tested through real DOM events and shell-free command arguments. Thirteen Node
+checks pass (nine editor, four Edge). The rebuilt wheel includes the Edge assets and
+its installed `connect` setup is checked separately from the source checkout.
+
+The backend and VS Code update were installed locally. `connect` prepared the stable
+extension directory and private pairing file without launching Edge. The one-time
+Load unpacked, pairing and tab selection are deliberately left to the user in their
+current profile. **Live Microsoft sign-in/DOM compatibility and an actual Copilot
+reply remain unverified** until setup is complete and `login`, `status`, `probe` pass.
+An existing Copilot service-error banner can still prevent a successful live probe.
+
+The sections below retain historical validation results for earlier releases.
+
 ## Observed environment
 
 Windows, PowerShell, Python 3.12.14, Git 2.45.2 and installed Microsoft Edge
