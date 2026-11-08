@@ -6,6 +6,8 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+from filelock import FileLock, Timeout
+
 from pilotpatch.security.storage import atomic_json
 
 
@@ -14,6 +16,8 @@ class SessionStore:
         self.home = home
         self.sessions = home / "sessions"
         self.sessions.mkdir(parents=True, exist_ok=True)
+        self.locks = home / "session-locks"
+        self.locks.mkdir(parents=True, exist_ok=True)
 
     def directory(self, session_id: str) -> Path:
         if not re.fullmatch(r"[a-f0-9]{32}", session_id):
@@ -46,6 +50,11 @@ class SessionStore:
         )
         self.save(state)
         return state
+
+    def task_lock(self, session_id: str) -> FileLock:
+        self.directory(session_id)  # Validate ownership path before constructing a lease.
+        # Keep the lease outside the directory so Windows can prune it while locked.
+        return FileLock(self.locks / f"{session_id}.lock", timeout=0)
 
     def save(self, state: dict):
         state["updated_at"] = datetime.now(UTC).isoformat()
@@ -80,12 +89,23 @@ class SessionStore:
 
     def prune(self, retention_days: int):
         cutoff = time.time() - retention_days * 86400
-        for entry in self.history():
-            directory = self.directory(entry["id"])
-            if (
-                entry["status"] == "completed"
-                and (directory / "state.json").stat().st_mtime < cutoff
-                and not (directory / "task.lock").exists()
-            ):
-                # Only owned, validated session directories with state evidence, under sessions/.
-                shutil.rmtree(directory)
+        # History is a 100-entry UI view; retention must inspect older sessions too.
+        for path in self.sessions.glob("*/state.json"):
+            try:
+                session_id = path.parent.name
+                with self.task_lock(session_id):
+                    state = self.load(session_id)
+                    directory = self.directory(session_id)
+                    if (
+                        state["status"] != "completed"
+                        or (directory / "state.json").stat().st_mtime >= cutoff
+                    ):
+                        continue
+                    # Respect an active pre-upgrade task too. Merely finding its old
+                    # lock file is insufficient: a crashed process can leave it behind.
+                    if (directory / "task.lock").exists():
+                        with FileLock(directory / "task.lock", timeout=0):
+                            pass
+                    shutil.rmtree(directory)
+            except (OSError, ValueError, KeyError, Timeout):
+                continue

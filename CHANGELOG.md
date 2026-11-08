@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1 — 2026-11-08
+
+- Revoke old selection when pairing changes and recheck authority after script injection.
+- Split submission into preparation and a one-shot, CLI-authorized synchronous commit.
+  Revoking the tab, disconnecting or stopping the CLI during preparation prevents Send.
+- Require protocol 2 and a versioned content channel. Old workers cannot receive prompts
+  and orphaned content listeners cannot act on upgraded commands.
+- Preserve substantive prose around JSON and require message-level completion controls;
+  generic Copy/code-copy buttons cannot complete a streaming response.
+- Fix completed-task terminal rendering and render approval descriptions as literal text.
+- Prune expired completed sessions beyond the 100-entry history view and handle abandoned
+  legacy lock markers while preserving active task leases.
+
 ## 0.2.0 — 2026-11-08
 
 - Default to the user's selected Copilot tab in their current Edge profile through

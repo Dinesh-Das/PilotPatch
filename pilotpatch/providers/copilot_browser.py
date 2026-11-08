@@ -185,10 +185,16 @@ class CopilotBrowser:
           const blocks = copy.querySelectorAll('pre');
           // Rendered JSON fences can have a separate language label and Copy bar.
           // Exactly one code block is safe to parse; multiple blocks remain ambiguous.
-          const text = blocks.length === 1
-            ? blocks[0].textContent : (copy.textContent || '');
+          let text = copy.textContent || '';
+          if (blocks.length === 1) {
+            const outside = copy.cloneNode(true);
+            outside.querySelector('pre').remove();
+            if (/^(?:json)?$/i.test(outside.textContent.trim())) text = blocks[0].textContent;
+          }
           if (text.length > max) return {oversize: true};
-          const completed = [...answer.querySelectorAll(s.completion)].some(visible);
+          const completed = [...answer.querySelectorAll(s.completion)].some(e =>
+            visible(e) && !e.closest('pre, code') &&
+            !/^copy(?:\\s+code.*)?$/i.test((e.getAttribute('aria-label') || '').trim()));
           const busy = answer.getAttribute('aria-busy') === 'true' ||
             !!answer.querySelector('[aria-busy="true"]');
           const generating = [...document.querySelectorAll(s.stop)].some(visible);

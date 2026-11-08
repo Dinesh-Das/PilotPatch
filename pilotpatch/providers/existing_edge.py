@@ -22,6 +22,8 @@ class CopilotExistingEdge:
         try:
             await self.bridge.open()
             await asyncio.wait_for(self.bridge.connected.wait(), self.config.edge_connect_timeout)
+            if self.bridge.connection_error:
+                raise ProviderError(self.bridge.connection_error)
         except TimeoutError as exc:
             await self.close()
             raise ProviderError(

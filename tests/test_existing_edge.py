@@ -16,7 +16,8 @@ EXTENSION = Path(__file__).resolve().parents[1] / "editors" / "edge"
 FIXTURE = """<!doctype html><html><body>
 <button aria-label="Account">Fixture account</button>
 <div data-content="user-message">old prompt</div>
-<div data-content="ai-message"><pre>old answer</pre><button aria-label="Copy">Copy</button></div>
+<div data-content="ai-message"><pre>old answer</pre>
+<button aria-label="Copy message">Copy</button></div>
 <textarea></textarea><button aria-label="Send message" onclick="send()">Send</button>
 <script>
 window.sentCount = 0;
@@ -28,7 +29,7 @@ function send() {
   const assistant=document.createElement('div'); assistant.dataset.content='ai-message';
   assistant.innerHTML='<pre>partial</pre>'; document.body.append(assistant);
   setTimeout(() => { assistant.innerHTML='<pre>Complete fixture answer</pre>' +
-    '<button aria-label="Copy">Copy</button>'; }, 100);
+    '<button aria-label="Copy message">Copy</button>'; }, 100);
 }
 </script></body></html>"""
 
@@ -177,7 +178,7 @@ async def test_intervening_user_turn_is_never_accepted_as_agent_response(connect
       marked.textContent=document.querySelector('textarea').value; document.body.append(marked);
       document.body.insertAdjacentHTML('beforeend', '<div data-content="user-message">Other</div>' +
         '<div data-content="ai-message"><pre>Wrong</pre>' +
-        '<button aria-label="Copy">Copy</button></div>');
+        '<button aria-label="Copy message">Copy</button></div>');
     };} """)
     with pytest.raises(ProviderError, match="ambiguous"):
         await provider.send("Agent request")

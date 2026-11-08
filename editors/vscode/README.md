@@ -8,7 +8,7 @@ Copilot Web** through your selected tab in your existing Edge profile.
 
 1. Set up the Python backend using the repository's `setup-windows.ps1`.
 2. In VS Code, open Extensions, choose **… → Install from VSIX…**, and select the
-   supplied `pilotpatch-0.2.0.vsix`.
+   supplied `pilotpatch-0.2.1.vsix`.
 3. Run **PilotPatch: Open Prompt Panel** from the command palette, or click the
    PilotPatch activity-bar icon.
 4. Choose **Select backend Python**, then select the backend virtual environment's

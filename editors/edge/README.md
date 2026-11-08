@@ -7,7 +7,7 @@ visible public page controls, never cookies, Microsoft auth storage or hidden en
 ## One-time setup
 
 1. Run `D:\MyProjects\PilotPatch\copilot.cmd connect`, or **Connect existing Edge**
-   in the 0.2.0 VS Code panel.
+   in the 0.2.1 VS Code panel.
 2. In **your current Edge profile**, open `edge://extensions`, enable Developer mode
    and choose **Load unpacked**. Select the printed `edge-extension` folder.
 3. Open the PilotPatch extension from Edge's Extensions menu. Select the printed
@@ -38,8 +38,9 @@ If an old Login task is still active, stop it yourself before starting the new c
 - A CLI-owned HTTP server binds only `127.0.0.1:57423`, checks Host, exact extension
   Origin and mutual HMAC proofs using a private 256-bit key, limits size/time/concurrency, and closes
   on task completion. No permanent service or external network listener is installed.
-- Protocol v1 uses a fresh challenge at POST `/hello` and encrypted JSON POST `/next`
-  and `/result`. A server instance has a fresh session ID; all requests have unique
+- Protocol v2 uses a fresh challenge at POST `/hello` and encrypted JSON POST `/next`,
+  `/commit` and `/result`. Legacy workers are rejected before receiving a prompt.
+  A server instance has a fresh session ID; all requests have unique
   random nonces and HMAC proofs, and responses are authenticated before parsing.
   The pairing secret is never transmitted. AES-256-GCM encrypts both directions using
   a domain-separated per-session derived key, fresh 96-bit IVs, and direction/session/
@@ -47,12 +48,18 @@ If an old Login task is still active, stop it yourself before starting the new c
   Copilot answers. Response size is capped while streaming, before buffering.
   Identity includes a random extension-install client ID, session-only selection ID
   and selected tab ID; one identity owns a CLI run.
+  Submission prepares the composer, rechecks pairing/selection, obtains a one-shot
+  grant for the still-pending CLI request, then synchronously commits in the pinned
+  document. Revocation while injecting/preparing prevents the click. Updating pairing
+  clears the old selection. Orphaned v1 content listeners use a different channel.
   Only status, submit and response operations exist. IDs are unique; delivered commands
   are not redelivered, and lost results are not retried. Never include token in logs.
 - Each submission has a fresh nonce. Only its following assistant message, with owned
   completion controls and stable content, can become an agent action. Reload/navigation,
   closed tabs, duplicate delivery and partial responses fail closed. Inspect Edge before
   resuming unknown outcomes; choose a fresh chat manually for resume.
+  Generic Copy/code-copy buttons do not establish completion; the default requires
+  Copy message. Prose outside JSON is preserved so examples/warnings fail strict parsing.
 - **Disconnect this profile** removes extension-side pairing/selection. CLI `logout`
   removes the backend token. Neither operation logs out of Microsoft or changes tabs.
 

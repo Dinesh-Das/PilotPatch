@@ -52,7 +52,7 @@ def test_retention_removes_only_completed_unlocked_sessions(tmp_path):
     done["status"] = "completed"
     store.save(done)
     directory = store.directory(done["id"])
-    # A released FileLock leaves its file behind; existence is not an active lease.
+    # A released lease must not block retention, whether its marker remains or not.
     with FileLock(directory / "task.lock"):
         pass
     expired = time.time() - 40 * 86400

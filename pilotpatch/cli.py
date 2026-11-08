@@ -104,7 +104,7 @@ async def _task(args, config, store, state, *, resume=False):
     permissions = Permissions(config.permission_mode, ui.confirm)
     repo = Repository(project, config)
     session_dir = store.directory(state["id"])
-    lock = FileLock(session_dir / "task.lock", timeout=0)
+    lock = store.task_lock(state["id"])
     provider = browser_provider(args.home, config)
     try:
         with lock:

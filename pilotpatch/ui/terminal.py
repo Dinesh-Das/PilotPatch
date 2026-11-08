@@ -2,6 +2,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm
 from rich.syntax import Syntax
+from rich.text import Text
 
 console = Console(highlight=False)
 
@@ -9,7 +10,7 @@ console = Console(highlight=False)
 def confirm(message: str) -> bool:
     if not console.is_terminal:
         return False
-    return Confirm.ask(message, default=False)
+    return Confirm.ask(Text(message), default=False)
 
 
 def preview(diff: str):
@@ -28,7 +29,7 @@ def banner(project):
 
 
 def report(result: dict):
-    console.print(Panel(result["copilot"]["summary"], title="Copilot summary", markup=False))
+    console.print(Panel(Text(result["copilot"]["summary"]), title="Copilot summary"))
     console.print(f"Applied file changes: {len(result['files_changed'])}", markup=False)
     for path in result["files_changed"]:
         console.print(f"  {path}", markup=False)

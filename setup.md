@@ -1,6 +1,6 @@
 # PilotPatch setup guide
 
-This guide covers PilotPatch **0.2.0** on Windows using **your current Edge profile
+This guide covers PilotPatch **0.2.1** on Windows using **your current Edge profile
 and an existing Copilot tab**. Microsoft Copilot Web is the only runtime AI provider.
 The default connection leaves your Edge window and sign-in open when a task ends.
 
@@ -26,7 +26,7 @@ $TargetProject = 'D:\MyProjects\Birthday Bash'
 $PilotPatchPython = Join-Path $PilotPatchRoot '.venv\Scripts\python.exe'
 $PilotPatchCli = Join-Path $PilotPatchRoot 'copilot.cmd'
 $PilotPatchState = Join-Path $env:LOCALAPPDATA 'PilotPatch'
-$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.2.0.vsix'
+$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.2.1.vsix'
 
 Set-Location -LiteralPath $PilotPatchRoot
 ```
@@ -89,7 +89,7 @@ Confirm the installation without contacting Copilot:
 & $PilotPatchCli --project $TargetProject doctor --offline
 ```
 
-The version should be `PilotPatch 0.2.0`. The diagnostic output should include
+The version should be `PilotPatch 0.2.1`. The diagnostic output should include
 `"browser_connection": "existing-edge"`. If it shows `managed-edge`, change
 `browser_connection` in your operator configuration as described in section 7.
 
@@ -407,6 +407,11 @@ code --install-extension $PilotPatchVsix --force
 
 Finally rerun `login`, `status` and `probe` from section 4. An already running Python
 task cannot load new connector code until it is restarted.
+
+Version 0.2.1 requires Edge extension protocol 2. A previous extension is rejected
+before it receives a prompt; run `connect`, **Reload** the Edge extension and select
+the tab again. Existing Copilot tabs stay open. A reply requires a distinct message-level
+completion control such as **Copy message**; generic Copy/code-copy buttons do not count.
 
 ## 10. Development, tests and packages
 

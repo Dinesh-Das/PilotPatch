@@ -21,6 +21,7 @@ $("pair").addEventListener("change", async () => {
     const file = $("pair").files[0];
     if (!file || file.size > 4096) throw new Error("Choose a valid PilotPatch pairing file.");
     const pair = PilotPatchConnection.validatePair(JSON.parse(await file.text()), chrome.runtime.id);
+    await chrome.storage.session.clear();
     await chrome.storage.local.set({pair});
     $("paired").textContent = "This profile is paired. Choose your Copilot tab below.";
   } catch { $("paired").textContent = "Invalid pairing file. Run pilotpatch connect and select edge-pairing.json."; }

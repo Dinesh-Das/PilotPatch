@@ -25,7 +25,8 @@ class Selectors(StrictModel):
     assistant: str = '[data-content="ai-message"], [data-testid="assistant-message"]'
     user: str = '[data-content="user-message"], [data-testid="user-message"]'
     stop: str = 'button[aria-label="Stop generating"], button[aria-label="Stop responding"]'
-    completion: str = 'button[aria-label="Copy"], button[aria-label="Copy message"]'
+    # A code-block Copy button can appear during streaming; require a message control.
+    completion: str = 'button[aria-label="Copy message" i]'
     signed_in: str = (
         'button[aria-label*="account" i], button[aria-label*="profile" i], '
         'button[title*="profile" i], [data-testid="user-avatar"], '

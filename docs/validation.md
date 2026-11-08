@@ -1,5 +1,14 @@
 # Validation report — 8 November 2026
 
+## Repeat audit fixes (0.2.1)
+
+Full suite: **134 passed, 5 skipped**; 13 Node checks passed. Ruff, package builds,
+installed-wheel checks, dependency audits and setup command syntax checks passed.
+See [the audit report](audit-2026-11-08.md) for six reproduced findings, fixes and
+regression evidence. Live account/selector compatibility and a real Copilot reply
+remain unverified. Protocol 2 rejects old Edge workers before prompt delivery;
+after updating, run `connect`, Reload the Edge extension and select the current tab.
+
 ## Existing Edge connection (0.2.0)
 
 Final full suite: **118 passed, 5 skipped**. Ruff checks and formatting, wheel/sdist

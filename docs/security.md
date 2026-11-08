@@ -41,6 +41,11 @@ permissions independently of prompt instructions.
   automatically replayed. The extension cannot read pairing from a content script.
   Tab selection is session-only and must be repeated after Edge restarts. Changing it
   invalidates the old polling loop; a running CLI never switches to a new conversation.
+  Protocol 2 rejects older workers before payload delivery. Submission separates
+  preparation from a synchronous commit, with current authority checks and a one-shot
+  grant from the still-pending CLI request. Old content listeners use a different channel.
+  Warning prose around JSON is preserved; generic Copy/code-copy controls cannot mark
+  a reply complete. Terminal summaries and approval descriptions render as literal text.
   Managed-edge is explicit opt-in and can adopt a unique sign-in tab only from its owned
   context. Once a task conversation has begun, status never switches tabs. Sign-in,
   chat readiness and verified prompt/reply connectivity are distinct states; a service

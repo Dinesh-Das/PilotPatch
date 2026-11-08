@@ -67,6 +67,7 @@ class Bridge:
         self.handlers = set()
         self.connected = asyncio.Event()
         self.identity = None
+        self.connection_error = None
         self.pending = None
         self.token = ""
         self.port = 0
@@ -85,6 +86,7 @@ class Bridge:
         try:
             self.connected.clear()
             self.identity = None
+            self.connection_error = None
             self.session = secrets.token_hex(32)
             self.nonces.clear()
             self.server = await asyncio.start_server(
@@ -128,6 +130,15 @@ class Bridge:
             self.pending = None
 
     def _dispatch(self, path, data):
+        if data.get("protocol") != 2:
+            if path == "/next" and self.identity is None:
+                self.connection_error = (
+                    "PilotPatch Edge extension needs an update. Run connect, then Reload "
+                    "the extension at edge://extensions and select your tab again. "
+                    "No prompt was submitted."
+                )
+                self.connected.set()
+            return 409, {"error": "extension_upgrade_required"}
         client, tab = data.get("client"), data.get("tab")
         if not isinstance(client, str) or not 1 <= len(client) <= 128 or type(tab) is not int:
             return 400, {"error": "invalid_identity"}
@@ -141,6 +152,19 @@ class Bridge:
                 self.pending["delivered"] = True
                 return 200, self.pending["command"]
             return 200, {"idle": True}
+        if path == "/commit":
+            pending = self.pending
+            if (
+                not pending
+                or not pending["delivered"]
+                or pending["future"].done()
+                or pending["command"]["action"] != "submit"
+                or data.get("id") != pending["command"]["id"]
+                or pending.get("commit_granted")
+            ):
+                return 409, {"error": "submit_not_pending"}
+            pending["commit_granted"] = True
+            return 200, {"authorized": True}
         if path == "/result":
             pending = self.pending
             if (
@@ -150,6 +174,13 @@ class Bridge:
                 or data.get("id") != pending["command"]["id"]
             ):
                 return 409, {"error": "stale_result"}
+            if (
+                pending["command"]["action"] == "submit"
+                and isinstance(data.get("result"), dict)
+                and data["result"].get("submitted") is True
+                and not pending.get("commit_granted")
+            ):
+                return 409, {"error": "commit_not_authorized"}
             if isinstance(data.get("error"), str):
                 # Extension returns fixed error codes, never page text or credentials.
                 explanations = {
@@ -223,7 +254,7 @@ class Bridge:
                             code, result = 403, {"error": "invalid_nonce"}
                         elif path == "/hello":
                             sign_response = True
-                            code, result = 200, {"session": self.session}
+                            code, result = 200, {"session": self.session, "protocol": 2}
                         else:
                             message = (f"request\n{self.session}\n{path}\n{nonce}\n").encode() + raw
                             expected = self.mac(message)

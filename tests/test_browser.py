@@ -16,7 +16,7 @@ FIXTURE = """<!doctype html><html><body>
 <button aria-label="Account">Test fixture account</button>
 <div data-content="user-message">historical prompt</div>
 <div data-content="ai-message"><pre>historical response</pre>
-<button aria-label="Copy">Copy</button></div>
+<button aria-label="Copy message">Copy</button></div>
 <textarea></textarea><button aria-label="Send message" onclick="send()">Send</button>
 <script>
 window.sentCount = 0;
@@ -31,7 +31,7 @@ window.send = () => {
   setTimeout(() => {
     assistant.querySelector('pre').textContent = JSON.stringify({type:'final',
       summary:'Complete response',files_changed:[],tests:'not run',remaining_issues:[]});
-    assistant.insertAdjacentHTML('beforeend','<button aria-label="Copy">Copy</button>');
+    assistant.insertAdjacentHTML('beforeend','<button aria-label="Copy message">Copy</button>');
     stop.remove();
   }, 300);
 };
@@ -93,7 +93,7 @@ async def test_intervening_user_turn_is_rejected(local_browser):
       user.textContent=document.querySelector('textarea').value; document.body.append(user);
       document.body.insertAdjacentHTML('beforeend', '<div data-content="user-message">Other</div>' +
         '<div data-content="ai-message"><pre>Wrong</pre>' +
-        '<button aria-label="Copy">Copy</button></div>');
+        '<button aria-label="Copy message">Copy</button></div>');
     };} """)
     with pytest.raises(ProviderError, match="Ambiguous"):
         await local_browser.send("Agent request")

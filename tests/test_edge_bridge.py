@@ -22,7 +22,9 @@ async def request(
     bridge, token=None, origin=None, path="/next", body=None, host=None, nonce=None, session=None
 ):
     reader, writer = await asyncio.open_connection("127.0.0.1", bridge.port)
-    payload = json.dumps(body or {"client": "test-client", "tab": 7}).encode()
+    value = dict(body or {"client": "test-client", "tab": 7})
+    value.setdefault("protocol", 2)
+    payload = json.dumps(value).encode()
     nonce = nonce or secrets.token_hex(32)
     if path != "/hello":
         payload = bridge.encrypt(payload, f"request\n{bridge.session}\n{path}\n{nonce}")
@@ -52,7 +54,7 @@ async def request(
     await writer.wait_closed()
     head, data = response.split(b"\r\n\r\n", 1)
     code = int(head.split()[1])
-    if code == 200:
+    if b"X-PilotPatch-Mac:" in head:
         proof = bridge.mac(f"response\n{nonce}\n{code}\n".encode() + data)
         assert f"X-PilotPatch-Mac: {proof}".encode() in head
         if path != "/hello":
@@ -81,7 +83,7 @@ async def test_challenge_proof_and_requests_cannot_replay_across_server_sessions
     await bridge.open()
     try:
         code, hello = await request(bridge, path="/hello")
-        assert code == 200 and hello == {"session": bridge.session}
+        assert code == 200 and hello == {"session": bridge.session, "protocol": 2}
         assert bridge.token not in json.dumps(hello)
         nonce = secrets.token_hex(32)
         assert (await request(bridge, nonce=nonce))[0] == 200
@@ -110,6 +112,46 @@ async def test_rpc_delivered_once_bound_to_client_and_tab(tmp_path):
         assert await call == {"state": "authenticated_ui"}
         assert (await request(bridge, path="/result", body=result))[0] == 409
         assert (await request(bridge))[1] == {"idle": True}
+    finally:
+        await bridge.close()
+
+
+async def test_submit_commit_grant_requires_live_pending_command_and_is_one_shot(tmp_path):
+    bridge = Bridge(tmp_path, port=0)
+    await bridge.open()
+    try:
+        call = asyncio.create_task(bridge.call("submit", {}, wait_seconds=2))
+        _, command = await request(bridge)
+        body = {"client": "test-client", "tab": 7, "id": command["id"]}
+        assert (await request(bridge, path="/result", body=dict(body, result={"submitted": True})))[
+            0
+        ] == 409
+        assert (await request(bridge, path="/commit", body=body))[1] == {"authorized": True}
+        assert (await request(bridge, path="/commit", body=body))[0] == 409
+        assert (await request(bridge, path="/result", body=dict(body, result={"submitted": True})))[
+            0
+        ] == 200
+        assert await call == {"submitted": True}
+        assert (await request(bridge, path="/commit", body=body))[0] == 409
+    finally:
+        await bridge.close()
+
+
+async def test_legacy_worker_never_receives_the_submit_payload(tmp_path):
+    bridge = Bridge(tmp_path, port=0)
+    await bridge.open()
+    try:
+        call = asyncio.create_task(
+            bridge.call("submit", {"text": "private prompt"}, wait_seconds=0.05)
+        )
+        code, body = await request(
+            bridge, body={"client": "old-client", "tab": 7, "protocol": None}
+        )
+        assert code == 409 and body == {"error": "extension_upgrade_required"}
+        assert "private prompt" not in json.dumps(body)
+        assert bridge.connection_error and "Reload" in bridge.connection_error
+        with pytest.raises(ProviderError):
+            await call
     finally:
         await bridge.close()
 

@@ -2,7 +2,7 @@
   "name": "pilotpatch",
   "displayName": "PilotPatch",
   "description": "Prompt your workspace through the local Microsoft Copilot Web-only PilotPatch harness.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "pilotpatch-local",
   "license": "MIT",
   "engines": {"vscode": "^1.85.0"},

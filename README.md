@@ -7,6 +7,7 @@ iterates on failures. PilotPatch supplies deterministic Python orchestration.
 **Status:** implemented with offline and local Edge tests. A real authorized Microsoft
 session is required to validate account-bound workflows. See [validation](docs/validation.md).
 No fake connector or alternative model is selectable at runtime.
+The latest [audit report](docs/audit-2026-11-08.md) records 0.2.1 fixes and validation limits.
 
 ## Windows setup
 
@@ -56,7 +57,7 @@ The panel launches the same Python harness for your selected local workspace; it
 prompts still go exclusively to Microsoft Copilot Web. Source-sharing consent,
 diffs, command approvals and actual output remain in the integrated task terminal.
 
-1. Install `artifacts/pilotpatch-0.2.0.vsix` through **Extensions → … → Install from VSIX…**.
+1. Install `artifacts/pilotpatch-0.2.1.vsix` through **Extensions → … → Install from VSIX…**.
 2. Run **PilotPatch: Open Prompt Panel** from the command palette.
 3. Click **Select backend Python** and select this installation's
    `.venv\Scripts\python.exe` (for this checkout: `D:\MyProjects\PilotPatch\.venv\Scripts\python.exe`).
@@ -114,7 +115,7 @@ request is never automatically refreshed or resubmitted.
 
 After updating an already running Login task, stop that old task once with Ctrl+C,
 then complete `connect` setup and choose **Sign in** again. The old Python process
-cannot load a new connector while running. Install the 0.2.0 VSIX for the new button;
+cannot load a new connector while running. Install the 0.2.1 VSIX for the panel;
 the CLI `connect` command also works with older panel versions.
 
 The former dedicated profile is available only by explicit opt-in:
@@ -247,7 +248,9 @@ state/backups as confidential source. See [security and recovery](docs/security.
   `selectors.signed_in` and `selectors.composer` in your operator YAML.
 - **Timeout/ambiguous turn:** verify `selectors.user`, `selectors.assistant`, `selectors.stop`
   and `selectors.completion`. The user selector must match the submitted message.
-  The assistant container must include its own completion/Copy controls. Do not weaken
+  The assistant container must include its own message-level completion controls.
+  The default requires **Copy message**; generic Copy/code-copy controls are insufficient.
+  Surrounding prose is retained so example JSON is rejected by the strict protocol. Do not weaken
   completion into text stability alone: that can execute partially streamed responses.
 - **UI drift:** default selectors are candidates; they have not been verified against
   authenticated production Copilot markup. Use `probe` after updating them.
