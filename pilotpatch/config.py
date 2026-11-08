@@ -18,7 +18,10 @@ class Selectors(StrictModel):
         '[contenteditable="true"][aria-label*="message" i], '
         '[contenteditable="true"][data-testid="chat-input"]'
     )
-    send: str = 'button[aria-label="Send message"], button[aria-label="Submit message"]'
+    send: str = (
+        'button[aria-label="Send message" i], button[aria-label="Submit message" i], '
+        'button[aria-label="Send" i]'
+    )
     assistant: str = '[data-content="ai-message"], [data-testid="assistant-message"]'
     user: str = '[data-content="user-message"], [data-testid="user-message"]'
     stop: str = 'button[aria-label="Stop generating"], button[aria-label="Stop responding"]'
@@ -38,6 +41,8 @@ class Selectors(StrictModel):
 
 class Config(StrictModel):
     provider: Literal["copilot_browser"] = "copilot_browser"
+    browser_connection: Literal["existing-edge", "managed-edge"] = "existing-edge"
+    edge_connect_timeout: int = Field(default=45, ge=1, le=120)
     permission_mode: Literal["read-only", "approve", "auto-edit"] = "approve"
     max_steps: int = Field(default=40, ge=1, le=500)
     format_retries: int = Field(default=2, ge=0, le=5)

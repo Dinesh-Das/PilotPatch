@@ -33,7 +33,7 @@
     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') submit(event);
   });
   for (const input of [prompt, mode, dryRun]) input.addEventListener('input', renderDraft);
-  for (const id of ['login', 'probe', 'doctor', 'workspace', 'stop', 'configure']) {
+  for (const id of ['connect', 'login', 'probe', 'doctor', 'workspace', 'stop', 'configure']) {
     element(id).addEventListener('click', () => send(id));
   }
   element('settings').addEventListener('click', () => send('configure'));
@@ -51,7 +51,7 @@
     element('panel-error').textContent = state.error || '';
     element('stop').hidden = !state.busy;
     element('stop').disabled = state.phase === 'preparing' || state.phase === 'stopping';
-    for (const id of ['login', 'probe', 'doctor', 'workspace', 'settings', 'configure', 'mode', 'dry-run']) {
+    for (const id of ['connect', 'login', 'probe', 'doctor', 'workspace', 'settings', 'configure', 'mode', 'dry-run']) {
       element(id).disabled = state.busy;
     }
     const list = element('activity');

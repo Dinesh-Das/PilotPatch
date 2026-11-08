@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pilotpatch"
-version = "0.1.2"
+version = "0.2.0"
 description = "A local, Microsoft Copilot-only coding harness for Windows"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,6 +12,7 @@ license = "MIT"
 dependencies = [
   "pydantic>=2.10,<3", "playwright>=1.64.1,<2", "rich>=13.9,<15",
   "pathspec>=0.12,<1", "filelock>=4.2.9,<5", "PyYAML>=6.0.2,<7",
+  "cryptography>=50.0.2,<52",
 ]
 
 [project.optional-dependencies]
@@ -23,6 +24,9 @@ copilot-agent = "pilotpatch.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["pilotpatch"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"editors/edge" = "pilotpatch/edge_extension"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

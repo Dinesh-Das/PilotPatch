@@ -8,7 +8,7 @@ import pytest
 from pilotpatch.agent.loop import AgentLoop
 from pilotpatch.agent.state import SessionStore
 from pilotpatch.config import default_home, load_config
-from pilotpatch.providers.copilot_browser import CopilotBrowser
+from pilotpatch.providers.factory import browser_provider
 from pilotpatch.security.permissions import Permissions
 from pilotpatch.tools.command_runner import CommandRunner
 from pilotpatch.tools.filesystem import FileTools
@@ -20,7 +20,7 @@ pytestmark = pytest.mark.live
 
 @pytest.fixture
 async def live_provider():
-    provider = CopilotBrowser(default_home(), load_config())
+    provider = browser_provider(default_home(), load_config())
     await provider.open()
     try:
         yield provider

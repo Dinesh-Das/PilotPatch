@@ -87,6 +87,19 @@ async def test_multiturn_binding(local_browser):
 
 
 @pytest.mark.browser
+async def test_intervening_user_turn_is_rejected(local_browser):
+    await local_browser.page.evaluate("""() => {window.send = () => {
+      const user=document.createElement('div'); user.dataset.content='user-message';
+      user.textContent=document.querySelector('textarea').value; document.body.append(user);
+      document.body.insertAdjacentHTML('beforeend', '<div data-content="user-message">Other</div>' +
+        '<div data-content="ai-message"><pre>Wrong</pre>' +
+        '<button aria-label="Copy">Copy</button></div>');
+    };} """)
+    with pytest.raises(ProviderError, match="Ambiguous"):
+        await local_browser.send("Agent request")
+
+
+@pytest.mark.browser
 async def test_timeout_never_executes_partial_or_resends(local_browser):
     await local_browser.page.evaluate("() => { window.send = () => { window.sentCount++; }; }")
     with pytest.raises(ProviderError, match="Timed out"):

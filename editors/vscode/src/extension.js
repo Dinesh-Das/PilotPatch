@@ -18,7 +18,7 @@ function activate(context) {
     },
   }));
   for (const [command, type] of Object.entries({
-    'pilotpatch.configure': 'configure', 'pilotpatch.login': 'login',
+    'pilotpatch.configure': 'configure', 'pilotpatch.login': 'login', 'pilotpatch.connect': 'connect',
     'pilotpatch.probe': 'probe', 'pilotpatch.doctor': 'doctor',
   })) context.subscriptions.push(vscode.commands.registerCommand(command, () => controller.handle({type})));
   context.subscriptions.push(vscode.commands.registerCommand('pilotpatch.open', async () => {

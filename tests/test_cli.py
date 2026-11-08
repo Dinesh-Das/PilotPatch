@@ -53,7 +53,7 @@ async def test_login_reports_sign_in_separately_from_chat_service_error(tmp_path
         return status
 
     provider = SimpleNamespace(open=AsyncMock(), close=AsyncMock(), login=login)
-    monkeypatch.setattr(cli, "CopilotBrowser", lambda *_: provider)
+    monkeypatch.setattr(cli, "browser_provider", lambda *_: provider)
     messages = []
     monkeypatch.setattr(cli.ui, "event", messages.append)
     assert await cli._browser_command("login", SimpleNamespace(home=tmp_path), Config()) == 0
@@ -77,6 +77,27 @@ async def test_status_returns_failure_when_signed_in_but_chat_has_error(tmp_path
             return_value=dict(authenticated=True, chat_ready=False, state="service_error")
         ),
     )
-    monkeypatch.setattr(cli, "CopilotBrowser", lambda *_: provider)
+    monkeypatch.setattr(cli, "browser_provider", lambda *_: provider)
     monkeypatch.setattr(cli.ui, "event", lambda _: None)
     assert await cli._browser_command("status", SimpleNamespace(home=tmp_path), Config()) == 2
+
+
+def test_connect_packages_assets_and_logout_preserves_profile(tmp_path, monkeypatch):
+    from pilotpatch import cli
+    from pilotpatch.browser.bridge import pairing
+    from pilotpatch.config import Config
+
+    messages = []
+    monkeypatch.setattr(cli.ui, "event", messages.append)
+    cli._connect(tmp_path)
+    token = pairing(tmp_path)["token"]
+    assert (tmp_path / "edge-extension" / "manifest.json").is_file()
+    assert not any(token in message for message in messages)
+    cli._connect(tmp_path)
+    assert pairing(tmp_path)["token"] == token
+    profile = tmp_path / "edge-profile"
+    profile.mkdir()
+    (profile / "keep.txt").write_text("do not touch")
+    cli._logout(tmp_path, Config())
+    assert (profile / "keep.txt").read_text() == "do not touch"
+    assert not (tmp_path / "edge-pairing.json").exists()

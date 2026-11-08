@@ -30,6 +30,7 @@ SENSITIVE_NAMES = {
     "id_ed25519",
     "credentials",
     "credentials.json",
+    "edge-pairing.json",
     "secrets.json",
     ".npmrc",
     ".pypirc",

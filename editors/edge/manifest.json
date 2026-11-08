@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "PilotPatch — Existing Edge Connection",
+  "version": "0.2.0",
+  "description": "Connect PilotPatch to the Copilot tab you choose in this Edge profile.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsJP0GECh7qPhjAKBIfAp6O4J00jJmkNFn9afsszqihYQA/WyTNJpKiqpZ8NlqR4AuEdSOKSC2Ly7yrhtk1ETn6RE6UHkfZAXxfED/g87XZxkgGFFspmPrdljP7MWefME8K48i8whz/eePHAB9QaGVR5az/2VxBMjdKL/poqoNAcBiReqLnvL7TfL1YYxPZdgCbHEbgbgLHfvbj7eL8x/GvMhSqUJuSgIB96Ps0RPBvlDxYzePTxvFqine3yvS/jDuY06IWhwQOMX0v6ug8wm/rKEE6dwqDx/G0rO9Kq6sTnbjMv8f++lSeigM3wSU3Y8dItaRVBp0AipUh/xWsH/uQIDAQAB",
+  "minimum_chrome_version": "120",
+  "permissions": ["storage", "alarms", "scripting"],
+  "host_permissions": [
+    "https://copilot.com/*",
+    "https://copilot.microsoft.com/*",
+    "https://copilot.ai/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {"service_worker": "background.js"},
+  "action": {"default_popup": "popup.html", "default_title": "PilotPatch"},
+  "content_security_policy": {"extension_pages": "script-src 'self'; object-src 'none'"}
+}

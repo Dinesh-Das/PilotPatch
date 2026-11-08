@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0 — 2026-11-08
+
+- Default to the user's selected Copilot tab in their current Edge profile through
+  a scoped Manifest V3 extension. No browser launch, profile copy or debugging port.
+- Add one-time `connect` setup and a Connect existing Edge button in the VS Code panel.
+  Pairing persists, the local transport is temporary, and closing a task leaves Edge open.
+- Mutually authenticate local requests without sending the private key; encrypt RPC
+  bodies with AES-GCM, reject replays, cap response streams and check extension origin. Confine
+  each run to one selected tab, reject duplicate commands and preserve unsent drafts.
+- Retain the dedicated Playwright profile only as explicit `managed-edge` opt-in.
+  Default logout removes pairing without changing the Microsoft account session.
+- Test the actual extension/background/broker against local browser fixtures. Live
+  account validation remains separate and requires installing/pairing the extension.
+
 ## 0.1.2 — 2026-11-08
 
 - Open Copilot's public chat page directly instead of its marketing landing page.

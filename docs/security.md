@@ -32,9 +32,17 @@ permissions independently of prompt instructions.
   evidence owned by that response, no generation/busy signal and stable content.
   Timeout, authentication failure, UI ambiguity and oversized output stop the loop.
   There is no retry of a potentially accepted browser submission.
-- Sign-in can adopt a unique ready account tab only from the context owned by that
-  process. Multiple candidates require the user to close the extra tabs. Once a task
-  conversation has begun, status checks never switch it to a different tab. Sign-in,
+- Default existing-edge mode uses only the tab selected in the installed extension.
+  It never creates a tab/profile, closes Edge or switches to another tab. The temporary
+  loopback server requires exact Host/extension Origin and mutual HMAC proofs with a
+  private random key that is never transmitted. AES-GCM encrypts RPC bodies with a
+  session-specific key, fresh nonces and context-bound authentication data;
+  its only operations are status, submit and response. Lost commands/results are never
+  automatically replayed. The extension cannot read pairing from a content script.
+  Tab selection is session-only and must be repeated after Edge restarts. Changing it
+  invalidates the old polling loop; a running CLI never switches to a new conversation.
+  Managed-edge is explicit opt-in and can adopt a unique sign-in tab only from its owned
+  context. Once a task conversation has begun, status never switches tabs. Sign-in,
   chat readiness and verified prompt/reply connectivity are distinct states; a service
   error never grants permission to refresh or resubmit a prompt automatically.
 
@@ -47,7 +55,9 @@ diffs; `.bak` files hold original source, including any original sensitive mater
 Protect backups as confidential source. Audit JSONL stores event metadata only.
 No telemetry is implemented. Completed session retention defaults to 30 days and is
 enforced on subsequent history/run/diff/resume commands. Active/interrupted tasks are
-retained to allow recovery. Browser state persists until `logout`.
+retained to allow recovery. In existing-edge mode, Microsoft sign-in remains in the
+user's Edge profile; `logout` deletes PilotPatch pairing only. In explicit managed-edge
+mode, `logout` can remove only the dedicated profile with its ownership marker.
 
 For recovery: `history`, then `diff SESSION_ID`, inspect `audit.jsonl` and current files.
 Backups are under `sessions/SESSION_ID/backups/RECORD/original.bak`; the adjacent

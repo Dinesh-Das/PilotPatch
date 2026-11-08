@@ -15,6 +15,7 @@ from pilotpatch.security.redaction import redact
         "src/.env.production",
         "id_rsa",
         "x.pem",
+        "edge-pairing.json",
         "a:stream",
         "a/../b",
         "CON",

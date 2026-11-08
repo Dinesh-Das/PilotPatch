@@ -2,7 +2,7 @@
   "name": "pilotpatch",
   "displayName": "PilotPatch",
   "description": "Prompt your workspace through the local Microsoft Copilot Web-only PilotPatch harness.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "pilotpatch-local",
   "license": "MIT",
   "engines": {"vscode": "^1.85.0"},
@@ -21,6 +21,7 @@
     "commands": [
       {"command": "pilotpatch.open", "title": "PilotPatch: Open Prompt Panel"},
       {"command": "pilotpatch.configure", "title": "PilotPatch: Select Backend Python"},
+      {"command": "pilotpatch.connect", "title": "PilotPatch: Connect Existing Edge"},
       {"command": "pilotpatch.login", "title": "PilotPatch: Sign In to Microsoft Copilot"},
       {"command": "pilotpatch.probe", "title": "PilotPatch: Test Copilot Connection"},
       {"command": "pilotpatch.doctor", "title": "PilotPatch: Check Setup"}

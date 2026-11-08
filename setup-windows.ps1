@@ -47,7 +47,8 @@ if (-not ($edgeCandidates | Where-Object { Test-Path -LiteralPath $_ })) {
     Write-Warning 'Microsoft Edge was not found. Install it through your approved software channel.'
 }
 Write-Host "PilotPatch installed. No browsers or system settings were changed."
-Write-Host "Run: & '$projectRoot\copilot.cmd' login"
+Write-Host "Run: & '$projectRoot\copilot.cmd' connect"
+Write-Host "Pair the extension with your current Edge profile, then run login."
 Write-Host "Then: & '$projectRoot\copilot.cmd' probe"
 Write-Host "To use copilot-agent anywhere in this PowerShell session:"
 Write-Host ('$env:Path = "' + $venvRoot + '\Scripts;' + '$env:Path"')

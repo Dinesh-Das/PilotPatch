@@ -1,6 +1,8 @@
 # Copy to %LOCALAPPDATA%\PilotPatch\config.yaml or select with --config.
 # Do not trust configuration supplied by the target repository.
 provider: copilot_browser
+browser_connection: existing-edge
+edge_connect_timeout: 45
 permission_mode: approve
 max_steps: 40
 format_retries: 2

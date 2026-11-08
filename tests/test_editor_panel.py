@@ -95,6 +95,9 @@ async def test_panel_empty_setup_then_keyboard_submission(editor_panel):
 @pytest.mark.browser
 async def test_panel_safe_text_running_stop_and_error_states(editor_panel):
     page, _ = editor_panel
+    await publish(page)
+    await page.get_by_role("button", name="Connect existing Edge").click()
+    assert await page.evaluate("window.panelMessages.at(-1)") == {"type": "connect"}
     await publish(page, workspace='<img src=x onerror="alert(1)">')
     assert await page.locator("#workspace-name").inner_text() == '<img src=x onerror="alert(1)">'
     assert await page.locator("#workspace-name img").count() == 0

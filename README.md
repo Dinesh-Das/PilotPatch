@@ -17,6 +17,8 @@ rights, Docker, WSL, API keys or background service required.
 cd D:\MyProjects\PilotPatch
 .\setup-windows.ps1
 # If needed: .\setup-windows.ps1 -Python 'C:\Path to Python\python.exe'
+.\copilot.cmd connect
+# Follow the one-time existing-Edge extension setup printed by connect.
 .\copilot.cmd login
 .\copilot.cmd status
 .\copilot.cmd probe
@@ -51,18 +53,21 @@ The panel launches the same Python harness for your selected local workspace; it
 prompts still go exclusively to Microsoft Copilot Web. Source-sharing consent,
 diffs, command approvals and actual output remain in the integrated task terminal.
 
-1. Install `artifacts/pilotpatch-0.1.0.vsix` through **Extensions → … → Install from VSIX…**.
+1. Install `artifacts/pilotpatch-0.2.0.vsix` through **Extensions → … → Install from VSIX…**.
 2. Run **PilotPatch: Open Prompt Panel** from the command palette.
 3. Click **Select backend Python** and select this installation's
    `.venv\Scripts\python.exe` (for this checkout: `D:\MyProjects\PilotPatch\.venv\Scripts\python.exe`).
-4. Open your target project, use **Sign in** and **Test connection**, then enter a
-   task and choose **Run task**. Ctrl/Cmd+Enter also submits the prompt.
+4. Click **Connect existing Edge** and follow its one-time installation/pairing steps.
+   Select your already-open Copilot tab in the extension in your current Edge profile.
+5. Use **Sign in** and **Test connection**, then enter a task and choose **Run task**.
+   Ctrl/Cmd+Enter also submits the prompt.
 
 **Permissions** selects approve/read-only/auto-edit; **Preview only** passes dry-run.
 **Change** selects a project in multi-root workspaces. **Stop task** stops only the
 owned editor task; inspect backend session state before resuming partial work.
 The editor's built-in AI chat remains separate. No model API, fallback provider or
-local HTTP server is introduced. Remote/WSL hosts and untrusted workspaces are blocked.
+remote AI service is introduced. The backend uses a temporary authenticated loopback
+connection to the Edge extension. Remote/WSL hosts and untrusted workspaces are blocked.
 
 Verified with VS Code 1.141.2 and Cursor 3.20.17 (VS Code API 1.128.0) using real
 extension hosts and an actual backend diagnostic process. Other compatible forks can
@@ -72,21 +77,31 @@ and security details. Node.js is required only for editor-extension development/
 
 ## Account and data destination
 
-`login` opens a dedicated persistent Edge profile. Complete normal Microsoft sign-in
-and MFA manually. PilotPatch never asks for passwords, imports your everyday profile,
-exports cookies or bypasses authentication. `status` requires a visible signed-in
-account indicator and a single composer; a chat box alone is insufficient. When an
-account label is unavailable, inspect the visible Edge account menu.
+The default connection uses **your existing Edge profile and selected Copilot tab**.
+Run `connect` once, then in that Edge profile open `edge://extensions`, enable
+Developer mode, choose **Load unpacked** and select the folder printed by `connect`.
+Open the PilotPatch extension, choose the printed `edge-pairing.json` file, select
+your Copilot tab and click **Connect this tab**. This follows Edge's documented
+[local extension installation](https://learn.microsoft.com/en-us/microsoft-edge/extensions/getting-started/extension-sideloading).
+
+`login` checks that selected tab and waits for manual sign-in/MFA there only if needed.
+It never launches a browser/profile or substitutes another tab. Closing a task leaves
+Edge, your tabs and Microsoft sign-in intact. Keep the selected tab open; finish or
+clear any unsent draft manually before starting a task. Pairing persists across runs.
+Select the tab again after restarting Edge; session-only selection prevents tab ID reuse.
+The extension reconnects within about 30 seconds; opening its popup and clicking
+Connect wakes it immediately when the local backend is available.
+
+PilotPatch never asks for passwords, imports profiles, exports cookies or bypasses
+authentication. `status` requires a visible signed-in account control and a single
+composer; a chat box or browser profile portrait alone is insufficient. Open Copilot's
+account menu if needed; a visible **Sign out** control also proves sign-in.
 
 `probe` submits a harmless random nonce and verifies the full reply without uploading
 source. It tests that session, not a complete coding workflow or office data authorization.
 
-The browser opens `https://copilot.com/chat` directly. Login follows a unique signed-in
-chat tab opened within its own Edge context and reports the controls it is waiting for.
-If chat is visible but the account control is unrecognized, open **Copilot's account
-menu**; a visible **Sign out** option is also accepted as positive sign-in evidence.
-The browser's own profile portrait and the presence of a text box alone do not prove
-that Copilot is signed in. No credentials or cookies are inspected.
+Use `https://copilot.com/chat` in your current Edge profile. No debugging port or
+profile copying is needed. See [connection details](editors/edge/README.md).
 
 Status reports `authenticated`, `chat_ready` and `connection_verified` separately.
 Sign-in detection does not verify a model reply. `service_error` means the page is
@@ -95,9 +110,14 @@ chat is not ready; `probe` is the actual prompt/reply connectivity check. A fail
 request is never automatically refreshed or resubmitted.
 
 After updating an already running Login task, stop that old task once with Ctrl+C,
-then choose **Sign in** again. It will reuse the same saved Edge profile. The old
-Python process cannot load a changed login checker while it is running; reinstalling
-the editor extension is unnecessary for this backend-only fix.
+then complete `connect` setup and choose **Sign in** again. The old Python process
+cannot load a new connector while running. Install the 0.2.0 VSIX for the new button;
+the CLI `connect` command also works with older panel versions.
+
+The former dedicated profile is available only by explicit opt-in:
+`copilot-agent --browser-connection managed-edge login`, or set
+`browser_connection: managed-edge` in operator-owned config. There is no automatic
+fallback to this mode. Existing dedicated profiles are left intact during the upgrade.
 
 Microsoft's [personal Copilot terms](https://www.microsoft.com/en-us/microsoft-copilot/for-individuals/termsofuse)
 prohibit automated access and explicitly exclude work/Entra accounts. Verify the
@@ -116,7 +136,7 @@ copilot-agent --share-code --mode auto-edit "Fix the failing tests."
 ```
 
 Before sharing context, PilotPatch asks you to authorize selected source/instructions
-and tool results to `https://copilot.microsoft.com/` using the dedicated profile's
+and tool results to Microsoft Copilot using the selected Edge connection's
 account. `--share-code` explicitly supplies that consent for the invocation; it
 does not approve commands. Initial context is bounded and relevant files are selected
 deterministically. Copilot requests further reads/searches incrementally. Project
@@ -172,10 +192,11 @@ strings are never executed. Batch arguments containing shell metacharacters are 
 
 | Command | Purpose |
 |---|---|
-| `login`, `logout` | Manual Microsoft sign-in; remove only the dedicated local profile |
+| `connect` | Prepare one-time extension pairing for your current Edge profile |
+| `login`, `logout` | Check/wait for sign-in; remove PilotPatch pairing (leave Edge signed in) |
 | `status`, `probe` | Account/composer check; harmless real communication check |
 | `run "task"` or `"task"` | Start in the current or `--project` directory |
-| `resume SESSION_ID` | Rebuild context in a fresh Copilot conversation |
+| `resume SESSION_ID` | Rebuild context; select a fresh Copilot chat manually first |
 | `diff [SESSION_ID]` | Session proposals or filtered Git text diff against HEAD |
 | `history` | Local session IDs, status, project and timestamps |
 | `config [--init]` | Display validated config or create a default |
@@ -183,7 +204,9 @@ strings are never executed. Batch arguments containing shell metacharacters are 
 
 Options work before/after commands. `--home` selects private state outside the project.
 Exit codes: 0 success, 1 error/denial, 2 failed status/doctor check, 130 cancellation.
-Logout removes local credentials; manage server-side revocation in your Microsoft account.
+In existing-edge mode, logout removes local pairing only. Disconnect in the extension
+too. Microsoft account logout/revocation remains manual. Explicit managed-edge logout
+retains the former behavior of deleting only PilotPatch's owned dedicated profile.
 
 ## Resume and recovery
 

@@ -13,8 +13,9 @@ from filelock import FileLock, Timeout
 from pilotpatch import __version__
 from pilotpatch.agent.loop import AgentLoop
 from pilotpatch.agent.state import SessionStore
+from pilotpatch.browser.bridge import pairing
 from pilotpatch.config import Config, default_home, load_config
-from pilotpatch.providers.copilot_browser import CopilotBrowser
+from pilotpatch.providers.factory import browser_provider
 from pilotpatch.security.permissions import Permissions
 from pilotpatch.security.redaction import redact
 from pilotpatch.security.storage import atomic_bytes, private_directory
@@ -35,6 +36,7 @@ COMMANDS = {
     "history",
     "config",
     "doctor",
+    "connect",
 }
 
 
@@ -53,6 +55,11 @@ def parser() -> argparse.ArgumentParser:
         "--config", dest="config_path", type=Path, help="Explicit operator-owned YAML"
     )
     result.add_argument("--mode", choices=["read-only", "approve", "auto-edit"])
+    result.add_argument(
+        "--browser-connection",
+        choices=["existing-edge", "managed-edge"],
+        help="Default: existing Edge tab through the PilotPatch extension",
+    )
     result.add_argument(
         "--dry-run",
         action="store_true",
@@ -81,8 +88,8 @@ def parser() -> argparse.ArgumentParser:
 def _consent(args):
     if not args.share_code and not ui.confirm(
         "Send selected repository source, project instructions and tool results for this task to "
-        "Microsoft Copilot at https://copilot.microsoft.com/ using the account in the dedicated "
-        "Edge profile? Confirm your organization permits this destination and account"
+        "Microsoft Copilot at https://copilot.com/ using the account in the selected "
+        "Edge connection? Confirm your organization permits this destination and account"
     ):
         raise PermissionError(
             "Source sharing declined. Use --share-code only when explicitly authorized"
@@ -98,7 +105,7 @@ async def _task(args, config, store, state, *, resume=False):
     repo = Repository(project, config)
     session_dir = store.directory(state["id"])
     lock = FileLock(session_dir / "task.lock", timeout=0)
-    provider = CopilotBrowser(args.home, config)
+    provider = browser_provider(args.home, config)
     try:
         with lock:
             if resume:
@@ -120,11 +127,19 @@ async def _task(args, config, store, state, *, resume=False):
 
 
 async def _browser_command(command, args, config):
-    provider = CopilotBrowser(args.home, config)
+    provider = browser_provider(args.home, config)
     try:
+        if config.browser_connection == "existing-edge":
+            ui.event(
+                "Connecting to your selected Copilot tab in existing Edge. "
+                "Keep it open; the PilotPatch extension connects automatically."
+            )
         await provider.open()
         if command == "login":
-            ui.event("Sign in manually in Edge, including MFA. Waiting up to 10 minutes.")
+            ui.event(
+                "Checking your selected Copilot tab. If needed, sign in manually there, "
+                "including MFA. Waiting up to 10 minutes."
+            )
 
             def login_progress(status):
                 messages = {
@@ -150,7 +165,7 @@ async def _browser_command(command, args, config):
                     ui.event(message)
 
             status = await provider.login(on_status=login_progress)
-            ui.event("Microsoft sign-in detected. The dedicated browser session is saved.")
+            ui.event("Microsoft sign-in detected. Your Edge connection is ready.")
             if status["state"] == "service_error":
                 ui.event(
                     "Copilot is signed in but shows a request/service error. After the login "
@@ -193,7 +208,15 @@ async def _browser_command(command, args, config):
     return 0
 
 
-def _logout(home: Path):
+def _logout(home: Path, config: Config):
+    if config.browser_connection == "existing-edge":
+        with FileLock(home / "browser.lock", timeout=0):
+            (home / "edge-pairing.json").unlink(missing_ok=True)
+        ui.event(
+            "Removed PilotPatch pairing. Disconnect in the Edge extension too. "
+            "Your Edge tabs and Microsoft sign-in were left intact."
+        )
+        return
     root = home.resolve()
     profile = home / "edge-profile"
     marker = profile / "pilotpatch-owned.json"
@@ -223,6 +246,7 @@ async def _doctor(args, config):
         "project_readable": args.project.is_dir() and os.access(args.project, os.R_OK),
         "project_writable": os.access(args.project, os.W_OK),
         "provider": config.provider,
+        "browser_connection": config.browser_connection,
         "alternative_models": False,
         "telemetry": False,
     }
@@ -237,13 +261,13 @@ async def _doctor(args, config):
     ]
     results["edge_found"] = any(p.is_file() for p in edges) or bool(shutil.which("msedge"))
     if not args.offline:
-        from pilotpatch.browser.session import EdgeSession
-
-        session = EdgeSession(args.home, config, headless=True)
+        session = browser_provider(args.home, config)
         try:
-            page = await session.open()
+            await session.open()
             results["edge_initialization"] = True
-            results["copilot_connectivity"] = page.url.startswith("https://copilot.")
+            status = await session.status()
+            results["chat_ready"] = status["chat_ready"]
+            results["live_reply_verified"] = False
         except Exception as exc:
             results["browser_error"] = redact(str(exc))
         finally:
@@ -256,6 +280,42 @@ async def _doctor(args, config):
         and results["edge_found"]
         and "browser_error" not in results
         else 2
+    )
+
+
+def _connect(home: Path):
+    with FileLock(home / "browser.lock", timeout=0):
+        _prepare_connection(home)
+
+
+def _prepare_connection(home: Path):
+    pairing(home, create=True)
+    source = Path(__file__).resolve().parent / "edge_extension"
+    if not source.is_dir():
+        source = Path(__file__).resolve().parent.parent / "editors" / "edge"
+    destination = home / "edge-extension"
+    # Copy only packaged extension assets to a stable location for Load unpacked.
+    destination.mkdir(exist_ok=True)
+    for name in (
+        "manifest.json",
+        "background.js",
+        "connection.js",
+        "content.js",
+        "popup.html",
+        "popup.css",
+        "popup.js",
+    ):
+        atomic_bytes(destination / name, (source / name).read_bytes())
+    ui.event(
+        "One-time setup in your CURRENT Edge profile:\n"
+        "1. Open edge://extensions, enable Developer mode and choose Load unpacked.\n"
+        f"   Select folder: {destination}\n"
+        "2. Open the PilotPatch extension and choose this local pairing file:\n"
+        f"   {home / 'edge-pairing.json'}\n"
+        "3. Select your already-open Copilot tab and click Connect this tab.\n"
+        "4. Run login, then probe (Test connection in VS Code).\n"
+        "No browser/profile was opened. Keep the pairing file private.\n"
+        "When updating an installed extension, click Reload on edge://extensions."
     )
 
 
@@ -274,6 +334,8 @@ async def dispatch(args) -> int:
     private_directory(args.home)
     config = load_config(args.config_path or args.home / "config.yaml")
     overrides = config.model_dump()
+    if args.browser_connection:
+        overrides["browser_connection"] = args.browser_connection
     if args.mode:
         overrides["permission_mode"] = args.mode
     if args.max_steps is not None:
@@ -282,7 +344,10 @@ async def dispatch(args) -> int:
     if command in {"login", "status", "probe"}:
         return await _browser_command(command, args, config)
     if command == "logout":
-        _logout(args.home)
+        _logout(args.home, config)
+        return 0
+    if command == "connect":
+        _connect(args.home)
         return 0
     if command == "doctor":
         return await _doctor(args, config)

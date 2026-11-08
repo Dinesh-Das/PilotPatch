@@ -2,19 +2,20 @@
 
 Enter a task in a dedicated PilotPatch panel and run the existing local harness
 against your selected workspace. All runtime AI reasoning goes to **Microsoft
-Copilot Web** through PilotPatch's persistent Edge connector.
+Copilot Web** through your selected tab in your existing Edge profile.
 
 ## Install
 
 1. Set up the Python backend using the repository's `setup-windows.ps1`.
 2. In VS Code, open Extensions, choose **… → Install from VSIX…**, and select the
-   supplied `pilotpatch-0.1.0.vsix`.
+   supplied `pilotpatch-0.2.0.vsix`.
 3. Run **PilotPatch: Open Prompt Panel** from the command palette, or click the
    PilotPatch activity-bar icon.
 4. Choose **Select backend Python**, then select the backend virtual environment's
    executable, for example `D:\MyProjects\PilotPatch\.venv\Scripts\python.exe`.
-5. Open the project you want to work on. In the PilotPatch panel, use **Sign in**
-   and complete Microsoft authentication in Edge, then **Test connection**.
+5. Open the project you want to work on. Use **Connect existing Edge** and follow
+   the printed one-time extension install/pairing steps. Select your current Copilot
+   tab in that Edge profile, then use **Sign in** and **Test connection**.
 6. Type a task and choose **Run task** (Ctrl/Cmd+Enter). Review source-sharing
    consent, proposed diffs, command approvals and actual results in the task terminal.
 

@@ -11,20 +11,21 @@ exports.run = async function () {
   assert.equal(vscode.workspace.isTrusted, true);
   const commands = await vscode.commands.getCommands(true);
   assert.ok(commands.includes('pilotpatch.open'));
+  assert.ok(commands.includes('pilotpatch.connect'));
   await vscode.commands.executeCommand('pilotpatch.open');
   const exit = new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {listener.dispose(); reject(new Error('Diagnostic task did not finish'));}, 60000);
+    const timer = setTimeout(() => {listener.dispose(); reject(new Error('Connect setup task did not finish'));}, 60000);
     const listener = vscode.tasks.onDidEndTaskProcess(event => {
       if (event.execution.task.definition.type === 'pilotpatch') {
         clearTimeout(timer); listener.dispose(); resolve(event.exitCode);
       }
     });
   });
-  await api.controller.handle({type: 'doctor'});
-  assert.equal(await exit, 0, 'Real Python doctor task must succeed');
+  await api.controller.handle({type: 'connect'});
+  assert.equal(await exit, 0, 'Real Python connect setup task must succeed');
   assert.equal(api.controller.state.phase, 'finished');
   const report = {editor: vscode.env.appName, version: vscode.version,
-    activated: true, commandRegistered: true, doctorExitCode: 0,
+    activated: true, commandRegistered: true, connectExitCode: 0,
     phase: api.controller.state.phase, workspace: api.controller.currentFolder().uri.fsPath};
   if (process.env.PILOTPATCH_EDITOR_REPORT) fs.writeFileSync(process.env.PILOTPATCH_EDITOR_REPORT, JSON.stringify(report, null, 2));
 };

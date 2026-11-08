@@ -50,6 +50,7 @@ function renderPanel(webview, extensionUri, Uri) {
   <section id="activity-section" class="activity" hidden><h2>Recent activity</h2><ol id="activity"></ol></section>
 </main>
 <footer><div class="tools" aria-label="Copilot setup and diagnostics">
+  <button id="connect" class="text-button">Connect existing Edge</button>
   <button id="login" class="text-button">Sign in</button><button id="probe" class="text-button">Test connection</button>
   <button id="doctor" class="text-button">Check setup</button><button id="settings" class="text-button">Backend</button>
 </div><p class="privacy">Routes to Microsoft Copilot Web.<br>Source-sharing consent and approvals happen in your terminal.</p></footer>

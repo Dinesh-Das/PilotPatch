@@ -33,7 +33,7 @@ test('rejects unknown messages, extra fields and permission escalation', () => {
 });
 
 test('diagnostics are fixed commands without model/source-sharing flags', () => {
-  for (const type of ['login', 'probe', 'doctor', 'history']) {
+  for (const type of ['connect', 'login', 'probe', 'doctor', 'history']) {
     const invocation = buildInvocation('C:\\Python\\python.exe', 'C:\\repo', parseRequest({type}));
     assert.equal(invocation.args.at(-1), type);
     assert.ok(!invocation.args.includes('--share-code'));

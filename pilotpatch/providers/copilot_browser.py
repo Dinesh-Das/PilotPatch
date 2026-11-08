@@ -171,6 +171,10 @@ class CopilotBrowser:
           const users = [...document.querySelectorAll(s.user)]
             .filter(e => visible(e) && e.innerText.includes(nonce));
           if (users.length !== 1) return {bound: false, ambiguous: users.length > 1};
+          if ([...document.querySelectorAll(s.user)].some(e => visible(e) && e !== users[0] &&
+            (users[0].compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING))) {
+            return {bound: false, ambiguous: true};
+          }
           const answers = [...document.querySelectorAll(s.assistant)].filter(e =>
             visible(e) && (users[0].compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING));
           if (answers.length !== 1) return {bound: false, ambiguous: answers.length > 1};
