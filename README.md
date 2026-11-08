@@ -10,6 +10,9 @@ No fake connector or alternative model is selectable at runtime.
 
 ## Windows setup
 
+See [setup.md](setup.md) for the complete PowerShell setup, existing Edge pairing,
+VS Code/fork installation, task commands, recovery and troubleshooting guide.
+
 Prerequisites: Windows 10/11, Python **3.11+**, Git, Microsoft Edge. No administrator
 rights, Docker, WSL, API keys or background service required.
 
