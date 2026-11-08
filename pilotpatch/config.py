@@ -13,16 +13,26 @@ def default_home() -> Path:
 
 
 class Selectors(StrictModel):
-    composer: str = 'textarea, [contenteditable="true"][role="textbox"]'
+    composer: str = (
+        'textarea, [contenteditable="true"][role="textbox"], '
+        '[contenteditable="true"][aria-label*="message" i], '
+        '[contenteditable="true"][data-testid="chat-input"]'
+    )
     send: str = 'button[aria-label="Send message"], button[aria-label="Submit message"]'
     assistant: str = '[data-content="ai-message"], [data-testid="assistant-message"]'
     user: str = '[data-content="user-message"], [data-testid="user-message"]'
     stop: str = 'button[aria-label="Stop generating"], button[aria-label="Stop responding"]'
     completion: str = 'button[aria-label="Copy"], button[aria-label="Copy message"]'
     signed_in: str = (
-        'button[aria-label*="Account"], button[aria-label*="Profile"], [data-testid="user-avatar"]'
+        'button[aria-label*="account" i], button[aria-label*="profile" i], '
+        'button[title*="profile" i], [data-testid="user-avatar"], '
+        '[data-testid="account-menu-button"], [data-testid="user-menu-button"], '
+        "#mectrl_main_trigger"
     )
-    sign_in: str = 'a[href*="login.live.com"], button[aria-label="Sign in"]'
+    sign_in: str = (
+        'a[href*="login.live.com"], button[aria-label="Sign in" i], '
+        'a[aria-label="Sign in" i], [role="button"][aria-label="Sign in" i]'
+    )
     errors: str = '[role="alert"]'
 
 

@@ -113,6 +113,9 @@ async def test_successful_startup_preserves_profile_and_security_options(tmp_pat
         assert launch.call_args.kwargs["channel"] == "msedge"
         assert launch.call_args.kwargs["chromium_sandbox"] is True
         assert launch.call_args.kwargs["headless"] is False
+        page.goto.assert_awaited_once_with(
+            "https://copilot.com/chat", wait_until="domcontentloaded", timeout=45000
+        )
         assert (session.home / "edge-profile/pilotpatch-owned.json").is_file()
     finally:
         await session.close()

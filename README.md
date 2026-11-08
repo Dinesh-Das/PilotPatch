@@ -81,6 +81,24 @@ account label is unavailable, inspect the visible Edge account menu.
 `probe` submits a harmless random nonce and verifies the full reply without uploading
 source. It tests that session, not a complete coding workflow or office data authorization.
 
+The browser opens `https://copilot.com/chat` directly. Login follows a unique signed-in
+chat tab opened within its own Edge context and reports the controls it is waiting for.
+If chat is visible but the account control is unrecognized, open **Copilot's account
+menu**; a visible **Sign out** option is also accepted as positive sign-in evidence.
+The browser's own profile portrait and the presence of a text box alone do not prove
+that Copilot is signed in. No credentials or cookies are inspected.
+
+Status reports `authenticated`, `chat_ready` and `connection_verified` separately.
+Sign-in detection does not verify a model reply. `service_error` means the page is
+showing a request failure, even when the account is signed in. `status` exits 2 when
+chat is not ready; `probe` is the actual prompt/reply connectivity check. A failed
+request is never automatically refreshed or resubmitted.
+
+After updating an already running Login task, stop that old task once with Ctrl+C,
+then choose **Sign in** again. It will reuse the same saved Edge profile. The old
+Python process cannot load a changed login checker while it is running; reinstalling
+the editor extension is unnecessary for this backend-only fix.
+
 Microsoft's [personal Copilot terms](https://www.microsoft.com/en-us/microsoft-copilot/for-individuals/termsofuse)
 prohibit automated access and explicitly exclude work/Entra accounts. Verify the
 applicable enterprise agreements and organization policy for your actual account.

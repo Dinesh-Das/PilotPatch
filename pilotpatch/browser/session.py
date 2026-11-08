@@ -9,6 +9,8 @@ from pilotpatch.config import Config
 from pilotpatch.providers.base import ProviderError
 from pilotpatch.security.storage import atomic_json, private_directory
 
+COPILOT_CHAT_URL = "https://copilot.com/chat"
+
 
 class EdgeSession:
     def __init__(self, home: Path, config: Config, *, headless: bool = False):
@@ -51,9 +53,7 @@ class EdgeSession:
             stage = "creating the Copilot tab"
             self.page = await self.context.new_page()
             stage = "opening the Copilot page"
-            await self.page.goto(
-                "https://copilot.microsoft.com/", wait_until="domcontentloaded", timeout=45000
-            )
+            await self.page.goto(COPILOT_CHAT_URL, wait_until="domcontentloaded", timeout=45000)
             return self.page
         except (Exception, asyncio.CancelledError) as exc:
             cleanup_failed = False

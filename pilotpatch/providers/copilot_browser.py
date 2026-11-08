@@ -4,13 +4,11 @@ import asyncio
 import secrets
 import time
 from pathlib import Path
-from urllib.parse import urlparse
 
+from pilotpatch.browser.readiness import copilot_origin, observe, service_error_visible, visible
 from pilotpatch.browser.session import EdgeSession
 from pilotpatch.config import Config
 from pilotpatch.providers.base import AuthenticationRequired, ProviderError
-
-COPILOT_HOSTS = {"copilot.microsoft.com", "copilot.com", "copilot.ai"}
 
 
 class CopilotBrowser:
@@ -29,47 +27,58 @@ class CopilotBrowser:
         await self.session.close()
 
     async def _visible(self, selector: str):
-        matches = self.page.locator(selector)
-        return [
-            matches.nth(i)
-            for i in range(await matches.count())
-            if await matches.nth(i).is_visible()
-        ]
+        return await visible(self.page, selector)
 
     def _copilot_origin(self) -> bool:
-        url = urlparse(self.page.url)
-        return url.scheme == "https" and url.hostname in COPILOT_HOSTS
+        return copilot_origin(self.page)
 
     async def status(self) -> dict:
-        if not self.page or self.page.is_closed():
-            return dict(authenticated=False, state="browser_closed", account="unavailable")
-        if not self._copilot_origin():
+        current = await observe(self.page, self.config.selectors)
+        if current["authenticated"] or self.conversation_url is not None:
+            return current
+        # Microsoft sign-in can finish in a popup/new tab. Only inspect pages in the
+        # context this process owns; never attach to another browser/profile/window.
+        context = self.session.context
+        candidates = []
+        for page in context.pages if context else []:
+            if page is self.page or page.is_closed() or not copilot_origin(page):
+                continue
+            status = await observe(page, self.config.selectors)
+            if status["authenticated"]:
+                candidates.append((page, status))
+        if len(candidates) == 1:
+            self.page, status = candidates[0]
+            self.session.page = self.page
+            return status
+        if len(candidates) > 1:
             return dict(
-                authenticated=False, state="manual_authentication_required", account="unavailable"
+                current, state="multiple_copilot_tabs", authenticated=False, chat_ready=False
             )
-        profiles = await self._visible(self.config.selectors.signed_in)
-        composers = await self._visible(self.config.selectors.composer)
-        authenticated = bool(profiles) and len(composers) == 1
-        # No cookies, localStorage, passwords or hidden authentication state are inspected.
-        account = "unavailable (inspect the visible Edge account menu)"
-        if len(profiles) == 1:
-            label = await profiles[0].get_attribute("aria-label")
-            if label:
-                account = label[:160]
-        return dict(
-            authenticated=authenticated,
-            state="authenticated_ui" if authenticated else "sign_in_or_selector_check_required",
-            account=account,
-            environment=urlparse(self.page.url).hostname,
-        )
+        return current
 
-    async def login(self, wait_seconds: float = 600) -> dict:
+    async def login(self, wait_seconds: float = 600, *, on_status=None) -> dict:
         deadline = time.monotonic() + wait_seconds
+        previous = None
+        status = None
         while time.monotonic() < deadline:
             status = await self.status()
+            signature = (status["state"], status["composer_count"], status["account_control_count"])
+            if signature != previous and on_status is not None:
+                on_status(status)
+            previous = signature
             if status["authenticated"]:
                 return status
-            await asyncio.sleep(1)
+            if status["state"] == "service_error":
+                raise ProviderError(
+                    "Copilot reports a service error before sign-in could be verified. "
+                    "Refresh the chat page manually and retry. No prompt was submitted."
+                )
+            await asyncio.sleep(min(0.5, max(0, deadline - time.monotonic())))
+        if status and status["state"] == "account_control_not_recognized":
+            raise AuthenticationRequired(
+                "Copilot chat is visible, but its signed-in account control was not recognized. "
+                "This is a selector/readiness issue; check selectors.signed_in in operator config."
+            )
         raise AuthenticationRequired(
             "Manual sign-in was not detected. Complete Microsoft sign-in/MFA "
             "in the dedicated Edge window; verify selectors if already signed in."
@@ -81,10 +90,42 @@ class CopilotBrowser:
                 "Previous browser turn has an unknown outcome; resume in a fresh conversation"
             )
         status = await self.status()
+        deadline = time.monotonic() + min(15, self.config.response_timeout)
+        while status["state"] in {
+            "waiting_for_copilot_chat",
+            "manual_authentication_required",
+            "chat_input_not_recognized",
+            "multiple_chat_inputs",
+        }:
+            if time.monotonic() >= deadline:
+                break
+            await asyncio.sleep(0.25)
+            status = await self.status()
+        if status["state"] == "service_error":
+            message = (
+                "You are signed in, but Copilot reports a service error."
+                if status["authenticated"]
+                else "Copilot reports a service error; sign-in is unverified."
+            )
+            raise ProviderError(
+                message + " Refresh the Copilot page manually and use Test connection "
+                "after it recovers. No prompt was submitted."
+            )
         if not status["authenticated"]:
+            if status["state"] == "account_control_not_recognized":
+                raise AuthenticationRequired(
+                    "Copilot chat is visible, but its account control was not recognized. "
+                    "Open Copilot's account menu or update selectors.signed_in. "
+                    "No prompt was submitted."
+                )
             raise AuthenticationRequired(
                 "Copilot sign-in expired or UI selectors changed. Run login/status; "
                 "complete authentication manually. No fallback is available."
+            )
+        if not status["chat_ready"]:
+            raise ProviderError(
+                "Sign-in was detected, but a unique Copilot chat input was not recognized. "
+                "Check selectors.composer; no prompt was submitted."
             )
 
     async def send(self, prompt: str) -> str:
@@ -165,6 +206,11 @@ class CopilotBrowser:
         while time.monotonic() < deadline:
             if not self._copilot_origin():
                 raise AuthenticationRequired("Copilot redirected to sign-in; authenticate manually")
+            if await service_error_visible(self.page, self.config.selectors):
+                raise ProviderError(
+                    "Copilot displayed an error before completing its response. "
+                    "Inspect the browser; the prompt was not resubmitted."
+                )
             data = await self._snapshot(nonce)
             if data.get("ambiguous"):
                 raise ProviderError("Ambiguous response turn; update user/assistant selectors")

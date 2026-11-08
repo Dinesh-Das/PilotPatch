@@ -70,6 +70,25 @@ repository so an untrusted current directory cannot substitute a local executabl
 
 ## Explicit skips and outstanding live acceptance
 
+### Login readiness fix (0.1.2)
+
+The user's screenshots showed a chat page and request-error banner while Login still
+printed its generic manual-sign-in wait. The prior checker matched only case-sensitive
+account/profile labels and inspected only the original tab. An isolated unauthenticated
+startup also showed that the old root URL could land on Copilot's marketing page.
+
+Regression fixtures now exercise account label changes, labelled editable inputs,
+explicit guest sign-in controls, an opened Sign out menu, owned-context popup/tab
+completion, multiple-tab ambiguity, delayed app rendering and service errors before
+any assistant answer exists. CLI tests verify sign-in progress and nonzero status
+when chat is unavailable. The user's running sign-in process and browser profile
+were not changed or closed during development. These fixtures do not establish that
+their live account or Microsoft's request service is working.
+The full 0.1.2 suite passed with **96 passed, 5 skipped**, plus nine passing editor
+tests. Ruff checks/formatting, the wheel/sdist build and editable upgrade passed.
+The prior Login task must be restarted once to load this checker; the editor extension
+and existing persistent profile are reused.
+
 ### Startup diagnostic fix (0.1.1)
 
 A reported VS Code login failure used a generic initialization error. During diagnosis,

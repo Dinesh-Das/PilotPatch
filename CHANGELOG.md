@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.2 — 2026-11-08
+
+- Open Copilot's public chat page directly instead of its marketing landing page.
+- Recognize account labels without case sensitivity, labelled editable chat inputs,
+  and a visible Sign out account menu. A visible Sign in control still prevents
+  anonymous/guest chat from being treated as authenticated.
+- Follow sign-in completion into a unique chat tab within the owned browser context.
+  Active task conversations are never switched to another tab automatically.
+- Report sign-in, chat readiness and Copilot service errors separately. Login prints
+  progress when the observed state changes; service errors no longer wait for an answer
+  that never appeared. No accepted prompt is automatically resubmitted.
+
 ## 0.1.1 — 2026-11-08
 
 - Browser startup failures report the failed stage and a sanitized underlying cause,

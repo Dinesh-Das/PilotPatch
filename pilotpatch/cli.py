@@ -125,7 +125,47 @@ async def _browser_command(command, args, config):
         await provider.open()
         if command == "login":
             ui.event("Sign in manually in Edge, including MFA. Waiting up to 10 minutes.")
-            ui.event(str(await provider.login()))
+
+            def login_progress(status):
+                messages = {
+                    "manual_authentication_required": (
+                        "Waiting for Microsoft sign-in to return to Copilot…"
+                    ),
+                    "sign_in_required": (
+                        "Copilot still shows Sign in. Complete sign-in in this Edge profile."
+                    ),
+                    "waiting_for_copilot_chat": (
+                        "Waiting for the Copilot page and account controls to load…"
+                    ),
+                    "account_control_not_recognized": (
+                        "Copilot chat is visible. If already signed in, open Copilot's account "
+                        "menu so its signed-in controls can be detected."
+                    ),
+                    "multiple_copilot_tabs": (
+                        "Multiple signed-in Copilot tabs found. Keep only the intended tab open."
+                    ),
+                }
+                message = messages.get(status["state"])
+                if message:
+                    ui.event(message)
+
+            status = await provider.login(on_status=login_progress)
+            ui.event("Microsoft sign-in detected. The dedicated browser session is saved.")
+            if status["state"] == "service_error":
+                ui.event(
+                    "Copilot is signed in but shows a request/service error. After the login "
+                    "task ends, use Test connection to check whether the service has recovered."
+                )
+            elif not status["chat_ready"]:
+                ui.event(
+                    "The account is signed in, but the chat input is not ready or recognized. "
+                    "Check the page and selectors.composer before running a task."
+                )
+            else:
+                ui.event(
+                    "Chat controls are ready. Use Test connection to verify a real Copilot reply."
+                )
+            ui.event(str(status))
         elif command == "status":
             # Give the client-rendered page a short, bounded opportunity to initialize.
             for _ in range(10):
@@ -134,7 +174,7 @@ async def _browser_command(command, args, config):
                     break
                 await asyncio.sleep(0.5)
             ui.event(json.dumps(status, indent=2))
-            return 0 if status["authenticated"] else 2
+            return 0 if status["chat_ready"] else 2
         elif command == "probe":
             from secrets import token_hex
 

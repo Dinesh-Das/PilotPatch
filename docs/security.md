@@ -32,6 +32,11 @@ permissions independently of prompt instructions.
   evidence owned by that response, no generation/busy signal and stable content.
   Timeout, authentication failure, UI ambiguity and oversized output stop the loop.
   There is no retry of a potentially accepted browser submission.
+- Sign-in can adopt a unique ready account tab only from the context owned by that
+  process. Multiple candidates require the user to close the extra tabs. Once a task
+  conversation has begun, status checks never switch it to a different tab. Sign-in,
+  chat readiness and verified prompt/reply connectivity are distinct states; a service
+  error never grants permission to refresh or resubmit a prompt automatically.
 
 State defaults to `%LOCALAPPDATA%\PilotPatch`. The directory receives user-only
 inheritable Windows ACLs (mode 0700 on Unix). Edge's browser storage holds credentials;
