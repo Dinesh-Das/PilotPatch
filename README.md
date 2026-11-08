@@ -191,6 +191,13 @@ state/backups as confidential source. See [security and recovery](docs/security.
 ## Troubleshooting and selector maintenance
 
 - **Missing Edge:** install through an approved software channel; setup never replaces it.
+- **Startup failure:** the CLI reports the failed stage and a short `Reason`, such as
+  `launching Microsoft Edge` or `opening the Copilot page` with its `net::ERR_...` code.
+  Browser logs and authentication URL details are omitted. Follow that specific reason
+  when checking installation, certificate trust, proxy or connectivity.
+- **An existing sign-in task is running:** finish in that Edge window first. Wait for
+  the login task to end before using **Test connection** or another browser command.
+  Do not delete the profile or close an active sign-in window to run diagnostics.
 - **Expired sign-in:** rerun `login`, handle MFA/challenges manually, then `status` and `probe`.
 - **Signed in but unrecognized:** inspect the actual visible DOM and override
   `selectors.signed_in` and `selectors.composer` in your operator YAML.

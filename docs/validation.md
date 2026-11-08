@@ -70,6 +70,22 @@ repository so an untrusted current directory cannot substitute a local executabl
 
 ## Explicit skips and outstanding live acceptance
 
+### Startup diagnostic fix (0.1.1)
+
+A reported VS Code login failure used a generic initialization error. During diagnosis,
+the user's subsequent VS Code login process was active and held the dedicated profile.
+It was left running as requested. The original failure was not reproduced: an isolated
+visible Edge profile opened Copilot successfully; a separate headless startup with the
+fix also reached `https://copilot.com/` and released its own lease.
+
+Six new regression tests cover stage/cause reporting, authentication-URL and browser-log
+redaction, preservation of the original error when cleanup fails, cancelled startup,
+active-profile isolation and unchanged Edge security options. They first reproduced
+four failures, then passed after the fix. These checks do not establish the cause of
+the original transient failure or validate the user's account authentication.
+The complete 0.1.1 suite passed with **81 passed, 5 skipped**; Ruff checks/formatting,
+the nine editor tests, wheel/sdist build and editable installation also passed.
+
 Four opt-in live tests were skipped because no authorized signed-in Microsoft
 account was provided. One filesystem symlink test was skipped because this Windows
 account lacks symlink-creation privilege. Lexical path traversal tests all ran;

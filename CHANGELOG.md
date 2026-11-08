@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1 — 2026-11-08
+
+- Browser startup failures report the failed stage and a sanitized underlying cause,
+  including network error codes, instead of hiding all failures behind one generic message.
+- Preserve the original failure if browser cleanup also fails; always attempt driver
+  cleanup and profile-lease release, including cancelled startup.
+- Added startup, cancellation, redaction and active-profile isolation regression tests.
+
 ## 0.1.0 — 2026-11-08
 
 - Initial Microsoft Copilot-only Python coding harness and Windows CLI.
