@@ -1,5 +1,16 @@
 # Validation report — 8 November 2026
 
+## Office-laptop repeat audit (0.2.2)
+
+**146 Python tests passed, 5 skipped**; 13 JavaScript checks passed. Ruff, dependency
+audits, Python/VSIX builds, installed-wheel asset checks and fresh wheel/source
+installations passed. The source setup was executed in real Windows PowerShell 5.1;
+both fresh installations used paths with spaces and a local wheelhouse. Binary
+availability passed for the corrected x64 CPython 3.11–3.13 locks; the full runtime
+suite ran on 3.12. See [the office audit](audit-2026-11-09.md) for reproduced findings,
+evidence and limits, and [the office checklist](office-laptop.md) for actual-laptop
+acceptance. No Microsoft account or live prompt was used in this validation.
+
 ## Repeat audit fixes (0.2.1)
 
 Full suite: **134 passed, 5 skipped**; 13 Node checks passed. Ruff, package builds,

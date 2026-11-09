@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.2 — 2026-11-09
+
+- Isolate backend imports in Windows launchers and editor tasks; project modules and
+  inherited Python paths cannot replace the backend before consent. Preserve alias
+  arguments without a second batch `CALL` expansion.
+- Fail `doctor` when Copilot chat, trusted executable Git or required project writes
+  are unavailable. Verify writes using an owned temporary file; skip writes in read-only mode.
+- Reject Windows reparse points on Python 3.11 as well as newer interpreters, closing
+  an internal junction alias into excluded directories.
+- Bound supported Python to 64-bit CPython 3.11–3.13, select a compatible installed
+  version, use a Python 3.11-compatible pyee pin and require binary runtime wheels.
+  Detect copied/broken virtual environments before package installation.
+- Add an office-laptop setup and acceptance checklist with portable paths and explicit
+  separation of local verification from live Microsoft account validation.
+
 ## 0.2.1 — 2026-11-08
 
 - Revoke old selection when pairing changes and recheck authority after script injection.

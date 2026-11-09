@@ -4,7 +4,9 @@ import importlib.metadata
 import json
 import os
 import shutil
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import yaml
@@ -242,14 +244,35 @@ def _logout(home: Path, config: Config):
 async def _doctor(args, config):
     results = {
         "python": sys.version.split()[0],
-        "git": bool(shutil.which("git")),
+        "git": False,
         "project_readable": args.project.is_dir() and os.access(args.project, os.R_OK),
-        "project_writable": os.access(args.project, os.W_OK),
+        "project_writable": None,
         "provider": config.provider,
         "browser_connection": config.browser_connection,
         "alternative_models": False,
         "telemetry": False,
     }
+    try:
+        # Use the same trusted Git resolution as repository operations, and actually
+        # start it so a PATH entry blocked by laptop policy cannot pass this check.
+        results["git_version"] = Repository(args.project, config)._git(["--version"]).strip()
+        results["git"] = True
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        results["git_error"] = redact(str(exc))
+    if config.permission_mode != "read-only":
+        # os.access on Windows does not establish NTFS ACL write permission. Probe
+        # only a uniquely owned temporary file; never overwrite project content.
+        results["project_writable"] = False
+        if os.access(args.project, os.W_OK):
+            try:
+                with tempfile.TemporaryFile(
+                    dir=args.project, prefix=".pilotpatch-doctor-"
+                ) as probe:
+                    probe.write(b"PilotPatch write check")
+                    probe.flush()
+                results["project_writable"] = True
+            except OSError:
+                pass
     for name in ["playwright", "pydantic", "rich", "pathspec", "filelock", "PyYAML"]:
         results[name] = importlib.metadata.version(name)
     edges = [
@@ -277,8 +300,10 @@ async def _doctor(args, config):
         0
         if results["git"]
         and results["project_readable"]
+        and (results["project_writable"] or config.permission_mode == "read-only")
         and results["edge_found"]
         and "browser_error" not in results
+        and (args.offline or results.get("chat_ready") is True)
         else 2
     )
 
@@ -327,6 +352,7 @@ async def dispatch(args) -> int:
     args.home = args.home.expanduser().resolve()
     # State must not be placed inside a repository which the agent can read/share.
     project = args.project.expanduser().resolve()
+    args.project = project
     if args.home.is_relative_to(project):
         raise ValueError(
             "--home must be outside the project to isolate browser credentials and backups"

@@ -22,7 +22,9 @@ function buildInvocation(executable, project, request) {
     if (typeof value !== 'string' || value.includes('\0') ||
         !(path.isAbsolute(value) || path.win32.isAbsolute(value))) throw new Error('Select absolute local paths.');
   }
-  const args = ['-m', 'pilotpatch', '--project', project];
+  // The target project's Python files and inherited PYTHONPATH cannot bootstrap
+  // the backend before its consent and permission checks run.
+  const args = ['-I', '-m', 'pilotpatch', '--project', project];
   if (request.type === 'run') {
     args.push('--mode', request.mode);
     if (request.dryRun) args.push('--dry-run');

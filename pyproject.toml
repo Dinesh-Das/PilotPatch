@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pilotpatch"
-version = "0.2.1"
+version = "0.2.2"
 description = "A local, Microsoft Copilot-only coding harness for Windows"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 license = "MIT"
 dependencies = [
   "pydantic>=2.10,<3", "playwright>=1.64.1,<2", "rich>=13.9,<15",

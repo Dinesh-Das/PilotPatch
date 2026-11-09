@@ -1,6 +1,10 @@
+import json
 import os
 import subprocess
 import sys
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -101,3 +105,111 @@ def test_connect_packages_assets_and_logout_preserves_profile(tmp_path, monkeypa
     cli._logout(tmp_path, Config())
     assert (profile / "keep.txt").read_text() == "do not touch"
     assert not (tmp_path / "edge-pairing.json").exists()
+
+
+@pytest.mark.parametrize(
+    "offline,chat_ready,writable,mode,expected",
+    [
+        (False, False, True, "approve", 2),
+        (False, True, True, "approve", 0),
+        (True, False, False, "approve", 2),
+        (True, False, False, "read-only", 0),
+    ],
+)
+async def test_doctor_requires_usable_project_and_chat(
+    tmp_path, monkeypatch, offline, chat_ready, writable, mode, expected
+):
+    from pilotpatch import cli
+    from pilotpatch.config import Config
+
+    provider = SimpleNamespace(
+        open=AsyncMock(),
+        close=AsyncMock(),
+        status=AsyncMock(return_value={"chat_ready": chat_ready}),
+    )
+    monkeypatch.setattr(cli, "browser_provider", lambda *_: provider)
+    monkeypatch.setattr(cli.Repository, "_git", lambda *_: "git version test")
+    monkeypatch.setattr(cli.shutil, "which", lambda _: sys.executable)
+    monkeypatch.setattr(cli.os, "access", lambda _, mode: writable if mode == os.W_OK else True)
+    messages = []
+    monkeypatch.setattr(cli.ui, "event", messages.append)
+    args = SimpleNamespace(project=tmp_path, home=tmp_path / "state", offline=offline)
+    assert await cli._doctor(args, Config(permission_mode=mode)) == expected
+    result = json.loads(messages[-1])
+    assert result["project_writable"] is (None if mode == "read-only" else writable)
+    if offline:
+        provider.open.assert_not_awaited()
+    else:
+        assert result["live_reply_verified"] is False
+        provider.close.assert_awaited_once()
+
+
+async def test_doctor_rejects_git_inside_target_project(tmp_path, monkeypatch):
+    from pilotpatch import cli
+    from pilotpatch.config import Config
+
+    local_git = tmp_path / "git.exe"
+    local_git.write_bytes(b"not a trusted Git executable")
+    monkeypatch.setattr(
+        cli.shutil, "which", lambda name: str(local_git) if name == "git" else sys.executable
+    )
+    monkeypatch.setattr(cli.ui, "event", lambda _: None)
+    args = SimpleNamespace(project=tmp_path, home=tmp_path / "state", offline=True)
+    assert await cli._doctor(args, Config()) == 2
+
+
+async def test_doctor_detects_write_denial_even_when_access_reports_writable(tmp_path, monkeypatch):
+    import tempfile
+
+    from pilotpatch import cli
+    from pilotpatch.config import Config
+
+    def denied(**_):
+        raise PermissionError("NTFS ACL denies create")
+
+    monkeypatch.setattr(tempfile, "TemporaryFile", denied)
+    monkeypatch.setattr(cli.os, "access", lambda *_: True)
+    monkeypatch.setattr(cli.Repository, "_git", lambda *_: "git version test")
+    monkeypatch.setattr(cli.shutil, "which", lambda _: sys.executable)
+    messages = []
+    monkeypatch.setattr(cli.ui, "event", messages.append)
+    args = SimpleNamespace(project=tmp_path, home=tmp_path / "state", offline=True)
+    assert await cli._doctor(args, Config()) == 2
+    assert json.loads(messages[-1])["project_writable"] is False
+
+
+@pytest.mark.parametrize("use_pythonpath", [False, True])
+def test_editor_backend_ignores_project_modules_and_pythonpath(tmp_path, use_pythonpath):
+    root = Path(__file__).resolve().parents[1]
+    project = tmp_path / "Office project"
+    project.mkdir()
+    (project / "pilotpatch.py").write_text("raise SystemExit(87)\n")
+    pythonpath = tmp_path / "pythonpath"
+    pythonpath.mkdir()
+    (pythonpath / "sitecustomize.py").write_text("raise SystemExit(88)\n")
+    invocation = subprocess.run(
+        [
+            "node",
+            "-e",
+            "process.stdout.write(JSON.stringify(require('./src/request').buildInvocation("
+            "process.argv[1], process.argv[2], {type:'history'})))",
+            sys.executable,
+            str(project),
+        ],
+        cwd=root / "editors/vscode",
+        capture_output=True,
+        encoding="utf-8",
+        check=True,
+        timeout=15,
+    )
+    command = json.loads(invocation.stdout)
+    result = subprocess.run(
+        [command["executable"], *command["args"], "--home", str(tmp_path / "state")],
+        cwd=command["cwd"],
+        env=dict(os.environ, PYTHONPATH=str(pythonpath) if use_pythonpath else ""),
+        capture_output=True,
+        encoding="utf-8",
+        timeout=15,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "[]" in result.stdout

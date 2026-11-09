@@ -7,7 +7,8 @@ iterates on failures. PilotPatch supplies deterministic Python orchestration.
 **Status:** implemented with offline and local Edge tests. A real authorized Microsoft
 session is required to validate account-bound workflows. See [validation](docs/validation.md).
 No fake connector or alternative model is selectable at runtime.
-The latest [audit report](docs/audit-2026-11-08.md) records 0.2.1 fixes and validation limits.
+The latest [audit report](docs/audit-2026-11-09.md) records office-laptop fixes and validation limits.
+Use the [office laptop checklist](docs/office-laptop.md) when moving to a managed Windows device.
 
 Source: [Dinesh-Das/PilotPatch](https://github.com/Dinesh-Das/PilotPatch).
 See [contribution instructions](CONTRIBUTING.md) for the local workflow and checks.
@@ -17,8 +18,9 @@ See [contribution instructions](CONTRIBUTING.md) for the local workflow and chec
 See [setup.md](setup.md) for the complete PowerShell setup, existing Edge pairing,
 VS Code/fork installation, task commands, recovery and troubleshooting guide.
 
-Prerequisites: Windows 10/11, Python **3.11+**, Git, Microsoft Edge. No administrator
-rights, Docker, WSL, API keys or background service required.
+Audited target: Windows 11 x64, **64-bit CPython 3.11–3.13**, Git and current Microsoft
+Edge (120+). Python 3.14+ is excluded by the dependency lock. Windows 10 and ARM64 are
+unverified. No administrator rights, Docker, WSL, API keys or background service required.
 
 ```powershell
 cd D:\MyProjects\PilotPatch
@@ -36,9 +38,9 @@ or replace Edge, modify script execution policy or change system settings. Use y
 approved package index/proxy. If scripts are restricted, install manually:
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m pip install --no-deps -e .
+py -3.12 -I -m venv .venv
+.\.venv\Scripts\python.exe -I -m pip install --only-binary=:all: -r requirements.txt
+.\.venv\Scripts\python.exe -I -m pip install --no-deps -e .
 ```
 
 To use both `pilotpatch` and `copilot-agent` anywhere in the current PowerShell session:
@@ -60,7 +62,7 @@ The panel launches the same Python harness for your selected local workspace; it
 prompts still go exclusively to Microsoft Copilot Web. Source-sharing consent,
 diffs, command approvals and actual output remain in the integrated task terminal.
 
-1. Install `artifacts/pilotpatch-0.2.1.vsix` through **Extensions → … → Install from VSIX…**.
+1. Install `artifacts/pilotpatch-0.2.2.vsix` through **Extensions → … → Install from VSIX…**.
 2. Run **PilotPatch: Open Prompt Panel** from the command palette.
 3. Click **Select backend Python** and select this installation's
    `.venv\Scripts\python.exe` (for this checkout: `D:\MyProjects\PilotPatch\.venv\Scripts\python.exe`).
@@ -118,7 +120,7 @@ request is never automatically refreshed or resubmitted.
 
 After updating an already running Login task, stop that old task once with Ctrl+C,
 then complete `connect` setup and choose **Sign in** again. The old Python process
-cannot load a new connector while running. Install the 0.2.1 VSIX for the panel;
+cannot load a new connector while running. Install the 0.2.2 VSIX for the panel;
 the CLI `connect` command also works with older panel versions.
 
 The former dedicated profile is available only by explicit opt-in:

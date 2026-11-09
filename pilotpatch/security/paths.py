@@ -1,6 +1,7 @@
 """Portable repository confinement, including Windows path aliases."""
 
 import re
+import stat
 from pathlib import Path, PureWindowsPath
 
 EXCLUDED = {
@@ -93,8 +94,17 @@ class PathGuard:
         # also keeps backup/rename operations from changing a different lexical file.
         cursor = lexical
         while cursor != self.root:
-            if cursor.is_symlink() or (hasattr(cursor, "is_junction") and cursor.is_junction()):
-                raise SafetyError("Symlinks and junctions are excluded")
+            try:
+                info = cursor.lstat()
+            except FileNotFoundError:
+                pass  # New files and parents are checked again before writes.
+            else:
+                # Path.is_junction is unavailable on supported Python 3.11. Reject
+                # every Windows reparse point before resolving aliases into the root.
+                if stat.S_ISLNK(info.st_mode) or (
+                    getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                ):
+                    raise SafetyError("Symlinks and junctions are excluded")
             cursor = cursor.parent
         resolved = lexical.resolve()
         if not resolved.is_relative_to(self.root) or resolved == self.root:

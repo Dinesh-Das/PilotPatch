@@ -1,6 +1,6 @@
 # PilotPatch setup guide
 
-This guide covers PilotPatch **0.2.1** on Windows using **your current Edge profile
+This guide covers PilotPatch **0.2.2** on Windows using **your current Edge profile
 and an existing Copilot tab**. Microsoft Copilot Web is the only runtime AI provider.
 The default connection leaves your Edge window and sign-in open when a task ends.
 
@@ -13,8 +13,11 @@ in [section 1](#1-requirements-and-paths), then continue at
 
 ## 1. Requirements and paths
 
-Required: Windows 10/11, Python 3.11 or newer, Git, Microsoft Edge, and a Microsoft
-Copilot account you are authorized to use. VS Code or a compatible desktop fork is
+Audited target: Windows 11 x64, 64-bit CPython 3.11–3.13, Git, current Microsoft Edge
+(120+), and a Microsoft Copilot account you are authorized to use. Python 3.14+ is
+excluded by this dependency lock; Windows 10 and ARM64 remain unverified. See the
+[office laptop checklist](docs/office-laptop.md) for portable paths and policy checks.
+VS Code or a compatible desktop fork is
 needed for the prompt panel. Node.js 20+ is needed only to build/test the extensions.
 
 For a new checkout, clone the GitHub repository first. Skip this command when the
@@ -34,7 +37,7 @@ $TargetProject = 'D:\MyProjects\Birthday Bash'
 $PilotPatchPython = Join-Path $PilotPatchRoot '.venv\Scripts\python.exe'
 $PilotPatchCli = Join-Path $PilotPatchRoot 'copilot.cmd'
 $PilotPatchState = Join-Path $env:LOCALAPPDATA 'PilotPatch'
-$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.2.1.vsix'
+$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.2.2.vsix'
 
 Set-Location -LiteralPath $PilotPatchRoot
 ```
@@ -42,7 +45,7 @@ Set-Location -LiteralPath $PilotPatchRoot
 Check the prerequisites and folders:
 
 ```powershell
-py -3 --version
+py -3.12 --version
 git --version
 Test-Path -LiteralPath $PilotPatchRoot
 Test-Path -LiteralPath $TargetProject
@@ -70,22 +73,25 @@ To select a specific installed Python, replace the example path:
 .\setup-windows.ps1 -Python 'C:\Path\To\Python\python.exe'
 ```
 
-The script creates `.venv`, installs `requirements.txt`, and installs PilotPatch from
-this checkout. If PowerShell policy blocks the script, use Method B.
+The script creates `.venv`, installs binary wheels from `requirements.txt`, and installs
+PilotPatch from this checkout. It reuses a working local environment and otherwise
+selects an installed supported Python version. If an existing `.venv` is broken or
+copied from another laptop, setup stops before installing packages; recreate that
+environment locally. If PowerShell policy blocks the script, use Method B.
 
 ### Method B: manual installation
 
 ```powershell
 Set-Location -LiteralPath $PilotPatchRoot
-py -3 -m venv .venv
-& $PilotPatchPython -m pip install -r (Join-Path $PilotPatchRoot 'requirements.txt')
-& $PilotPatchPython -m pip install --no-deps -e $PilotPatchRoot
+py -3.12 -I -m venv .venv
+& $PilotPatchPython -I -m pip install --only-binary=:all: -r (Join-Path $PilotPatchRoot 'requirements.txt')
+& $PilotPatchPython -I -m pip install --no-deps -e $PilotPatchRoot
 ```
 
 Without the Python launcher, replace only the environment creation command:
 
 ```powershell
-& 'C:\Path\To\Python\python.exe' -m venv (Join-Path $PilotPatchRoot '.venv')
+& 'C:\Path\To\Python\python.exe' -I -m venv (Join-Path $PilotPatchRoot '.venv')
 ```
 
 Confirm the installation without contacting Copilot:
@@ -97,7 +103,7 @@ Confirm the installation without contacting Copilot:
 & $PilotPatchCli --project $TargetProject doctor --offline
 ```
 
-The version should be `PilotPatch 0.2.1`. The diagnostic output should include
+The version should be `PilotPatch 0.2.2`. The diagnostic output should include
 `"browser_connection": "existing-edge"`. If it shows `managed-edge`, change
 `browser_connection` in your operator configuration as described in section 7.
 
@@ -279,7 +285,7 @@ Limit the agent loop:
 The equivalent direct Python invocation is:
 
 ```powershell
-& $PilotPatchPython -m pilotpatch --project $TargetProject run 'Explain the project structure.'
+& $PilotPatchPython -I -m pilotpatch --project $TargetProject run 'Explain the project structure.'
 ```
 
 To use the installed entry points from any directory in this PowerShell session:
@@ -399,8 +405,8 @@ Stop PilotPatch tasks first. After obtaining the updated source in this checkout
 
 ```powershell
 Set-Location -LiteralPath $PilotPatchRoot
-& $PilotPatchPython -m pip install -r (Join-Path $PilotPatchRoot 'requirements.txt')
-& $PilotPatchPython -m pip install --no-deps -e $PilotPatchRoot
+& $PilotPatchPython -I -m pip install --only-binary=:all: -r (Join-Path $PilotPatchRoot 'requirements.txt')
+& $PilotPatchPython -I -m pip install --no-deps -e $PilotPatchRoot
 & $PilotPatchCli --version
 & $PilotPatchCli connect
 ```
@@ -416,7 +422,7 @@ code --install-extension $PilotPatchVsix --force
 Finally rerun `login`, `status` and `probe` from section 4. An already running Python
 task cannot load new connector code until it is restarted.
 
-Version 0.2.1 requires Edge extension protocol 2. A previous extension is rejected
+Version 0.2.1 and later require Edge extension protocol 2. A previous extension is rejected
 before it receives a prompt; run `connect`, **Reload** the Edge extension and select
 the tab again. Existing Copilot tabs stay open. A reply requires a distinct message-level
 completion control such as **Copy message**; generic Copy/code-copy buttons do not count.
@@ -497,6 +503,8 @@ tab without submitting a model prompt:
 | Symptom | Action |
 | --- | --- |
 | Python opens the Microsoft Store or is missing | Use the installed Python's full path with setup Method A or B. |
+| Python 3.14+ or 32-bit Python is installed | Select approved 64-bit CPython 3.11–3.13 with `-Python`; this lock does not require compiling native dependencies. |
+| Copied `.venv` does not start | Recreate it on this laptop; transfer source/packages, not virtual environments or private state. |
 | `code` or `cursor` is not recognized | Use the absolute VS Code CLI above or Install from VSIX in your editor. |
 | Existing Edge is not paired | Run `connect`, load the unpacked extension in the current profile, then choose the pairing file and tab. |
 | No existing Edge tab connected | Keep Edge open. Check that the extension is enabled in that profile, choose the tab, click Connect while the CLI waits. |

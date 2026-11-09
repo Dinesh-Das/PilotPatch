@@ -1,7 +1,12 @@
+import os
+import subprocess
+from pathlib import Path
+
 import pytest
 
 from pilotpatch.security.paths import PathGuard, SafetyError
 from pilotpatch.security.redaction import redact
+from pilotpatch.security.system import windows_binary
 
 
 @pytest.mark.parametrize(
@@ -42,6 +47,27 @@ def test_symlink_escape(tmp_path):
         pytest.skip("OS requires symlink privilege")
     with pytest.raises(SafetyError):
         PathGuard(tmp_path).resolve("link/file")
+
+
+@pytest.mark.skipif(os.name != "nt", reason="NTFS junction regression")
+def test_internal_junction_cannot_alias_excluded_files_on_python311(tmp_path, monkeypatch):
+    excluded = tmp_path / ".git"
+    excluded.mkdir()
+    (excluded / "config").write_text("private repository metadata")
+    alias = tmp_path / "ordinary"
+    subprocess.run(
+        [windows_binary("cmd.exe"), "/d", "/c", "mklink", "/J", str(alias), str(excluded)],
+        capture_output=True,
+        check=True,
+    )
+    try:
+        # Python 3.11 has no Path.is_junction; use its API surface on newer test hosts too.
+        monkeypatch.delattr(Path, "is_junction", raising=False)
+        with pytest.raises(SafetyError):
+            PathGuard(tmp_path).resolve("ordinary/config")
+    finally:
+        alias.rmdir()  # Remove only our junction, never its target.
+    assert (excluded / "config").is_file()
 
 
 def test_redacts_common_credentials():

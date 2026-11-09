@@ -5,6 +5,10 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = $PSScriptRoot
+$venvRoot = Join-Path $projectRoot '.venv'
+$venvPython = Join-Path $venvRoot 'Scripts\python.exe'
+# Single-quoted Python literals survive legacy PowerShell 5.1 native argument passing.
+$pythonCheck = "import sys; assert (3,11) <= sys.version_info < (3,14) and sys.maxsize > 2**32 and sys.implementation.name == 'cpython', '64-bit CPython 3.11-3.13 required'"
 
 function Invoke-Checked {
     param([string]$Executable, [string[]]$Arguments)
@@ -12,11 +16,26 @@ function Invoke-Checked {
     if ($LASTEXITCODE -ne 0) { throw "Command failed with exit code $LASTEXITCODE" }
 }
 
+if (Test-Path -LiteralPath $venvPython) {
+    try {
+        Invoke-Checked $venvPython @('-I', '-c', $pythonCheck)
+    } catch {
+        throw "Existing .venv cannot run 64-bit Python 3.11-3.13. Virtual environments are not portable: recreate .venv on this laptop with an approved Python installation, then rerun setup. No packages were installed."
+    }
+    if (-not $Python) { $Python = $venvPython }
+}
 if (-not $Python) {
     $launcher = Get-Command py.exe -ErrorAction SilentlyContinue
     if ($launcher) {
-        $Python = & $launcher.Source -3 -c 'import sys; print(sys.executable)'
-        if ($LASTEXITCODE -ne 0) { $Python = $null }
+        foreach ($version in @('-3.13', '-3.12', '-3.11')) {
+            try {
+                $candidate = & $launcher.Source $version -c 'import sys; print(sys.executable)' 2>$null
+                if ($LASTEXITCODE -eq 0) { $Python = $candidate; break }
+            } catch {
+                # PowerShell 5.1 can turn even redirected native stderr into an error.
+                continue
+            }
+        }
     }
     if (-not $Python) {
         $candidate = Get-Command python.exe -ErrorAction SilentlyContinue
@@ -24,19 +43,17 @@ if (-not $Python) {
     }
 }
 if (-not $Python) {
-    throw 'Install Python 3.11+ from python.org, then rerun; or use -Python C:\Path\python.exe.'
+    throw 'Install approved 64-bit Python 3.11-3.13, then rerun; or use -Python C:\Path\python.exe.'
 }
-Invoke-Checked $Python @('-c', 'import sys; assert sys.version_info >= (3,11), "Python 3.11+ required"')
-$venvRoot = Join-Path $projectRoot '.venv'
-$venvPython = Join-Path $venvRoot 'Scripts\python.exe'
+Invoke-Checked $Python @('-I', '-c', $pythonCheck)
 if (-not (Test-Path -LiteralPath $venvPython)) {
-    Invoke-Checked $Python @('-m', 'venv', $venvRoot)
+    Invoke-Checked $Python @('-I', '-m', 'venv', $venvRoot)
 }
-Invoke-Checked $venvPython @('-m', 'pip', 'install', '-r', (Join-Path $projectRoot 'requirements.txt'))
+Invoke-Checked $venvPython @('-I', '-m', 'pip', 'install', '--only-binary=:all:', '-r', (Join-Path $projectRoot 'requirements.txt'))
 if ($Dev) {
-    Invoke-Checked $venvPython @('-m', 'pip', 'install', '-e', "$projectRoot[dev]")
+    Invoke-Checked $venvPython @('-I', '-m', 'pip', 'install', '-e', "$projectRoot[dev]")
 } else {
-    Invoke-Checked $venvPython @('-m', 'pip', 'install', '--no-deps', '-e', $projectRoot)
+    Invoke-Checked $venvPython @('-I', '-m', 'pip', 'install', '--no-deps', '-e', $projectRoot)
 }
 $edgeCandidates = @(
     (Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'),
