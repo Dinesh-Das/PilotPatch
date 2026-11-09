@@ -5,6 +5,13 @@
   "version": "0.2.1",
   "publisher": "pilotpatch-local",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Dinesh-Das/PilotPatch.git",
+    "directory": "editors/vscode"
+  },
+  "homepage": "https://github.com/Dinesh-Das/PilotPatch#prompt-from-vs-code-or-cursor",
+  "bugs": {"url": "https://github.com/Dinesh-Das/PilotPatch/issues"},
   "engines": {"vscode": "^1.85.0"},
   "categories": ["Other"],
   "extensionKind": ["workspace"],
