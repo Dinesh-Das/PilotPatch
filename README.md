@@ -9,6 +9,9 @@ session is required to validate account-bound workflows. See [validation](docs/v
 No fake connector or alternative model is selectable at runtime.
 The latest [audit report](docs/audit-2026-11-08.md) records 0.2.1 fixes and validation limits.
 
+Source: [Dinesh-Das/PilotPatch](https://github.com/Dinesh-Das/PilotPatch).
+See [contribution instructions](CONTRIBUTING.md) for the local workflow and checks.
+
 ## Windows setup
 
 See [setup.md](setup.md) for the complete PowerShell setup, existing Edge pairing,

@@ -17,6 +17,14 @@ Required: Windows 10/11, Python 3.11 or newer, Git, Microsoft Edge, and a Micros
 Copilot account you are authorized to use. VS Code or a compatible desktop fork is
 needed for the prompt panel. Node.js 20+ is needed only to build/test the extensions.
 
+For a new checkout, clone the GitHub repository first. Skip this command when the
+folder already contains your checkout. Private repository access requires your
+authorized GitHub account:
+
+```powershell
+git clone 'https://github.com/Dinesh-Das/PilotPatch.git' 'D:\MyProjects\PilotPatch'
+```
+
 The examples use your existing checkout and target project. Change these two paths
 if you move either folder. Set these variables again in each new PowerShell window:
 
