@@ -1,3 +1,39 @@
+<#
+.SYNOPSIS
+Installs the PilotPatch backend and optionally the local VS Code extension.
+
+.DESCRIPTION
+Paths below are relative to this script unless they start with %LOCALAPPDATA%.
+Creates or reuses .venv\ beside this script. The backend runs from
+.venv\Scripts\python.exe, and its dependencies install into .venv\Lib\site-packages.
+An extracted office bundle supplies the backend wheel in dist\ and dependencies in wheelhouse\.
+
+Setup writes %LOCALAPPDATA%\PilotPatch\editor-backend.json so the VS Code extension
+can find the installed Python. Its full path is printed during setup.
+
+With -InstallEditor, setup installs artifacts\pilotpatch-VERSION.vsix into VS Code.
+If the VSIX is missing, setup first builds it alongside the Python wheel, Python
+source archive and Edge ZIP in artifacts\. VERSION comes from pyproject.toml.
+
+After setup, choose Set up Copilot in VS Code or run .\copilot.cmd connect.
+That step prepares %LOCALAPPDATA%\PilotPatch\edge-extension\manifest.json and the
+other Edge extension files, plus the private edge-pairing.json in the same PilotPatch directory.
+
+.PARAMETER Python
+Full path to an approved 64-bit CPython 3.11, 3.12 or 3.13 executable.
+
+.PARAMETER Dev
+Installs the development tools into the same .venv\.
+
+.PARAMETER InstallEditor
+Installs the PilotPatch VSIX using the local VS Code command-line tool.
+
+.EXAMPLE
+.\setup-windows.ps1
+
+.EXAMPLE
+.\setup-windows.ps1 -InstallEditor
+#>
 [CmdletBinding()]
 param(
     [string]$Python,
@@ -80,6 +116,7 @@ if ($InstallEditor) {
         Invoke-Checked $venvPython @('-I', (Join-Path $projectRoot 'scripts\build.py'), '--no-office')
     }
     Invoke-Checked $editor.Source @('--install-extension', $vsix)
+    Write-Host "Installed the VS Code extension from $vsix"
     Write-Host 'Open your project in VS Code, click PilotPatch, then choose Set up Copilot.'
 }
 $edgeCandidates = @(
@@ -90,7 +127,8 @@ $edgeCandidates = @(
 if (-not ($edgeCandidates | Where-Object { Test-Path -LiteralPath $_ })) {
     Write-Warning 'Microsoft Edge was not found. Install it through your approved software channel.'
 }
-Write-Host 'PilotPatch backend installed.'
+Write-Host "PilotPatch $version installed into $venvRoot"
+Write-Host "Backend Python is $venvPython"
 if (-not $InstallEditor) {
     Write-Host 'For VS Code, rerun setup with -InstallEditor.'
     Write-Host "For the command line, run: & '$projectRoot\copilot.cmd' connect"

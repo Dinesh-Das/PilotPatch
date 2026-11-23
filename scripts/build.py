@@ -202,7 +202,11 @@ def build_office(python, stage, index, sdist, wheel, vsix, edge_zip, target):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        prog="build.cmd",
+        description=__doc__,
+        epilog="Packages are saved in the artifacts folder beside build.cmd.",
+    )
     parser.add_argument("--no-office", action="store_true", help="Skip the offline Windows bundle.")
     parser.add_argument("--wheelhouse", type=Path, help="Use only this local directory for pip.")
     options = parser.parse_args()
@@ -252,7 +256,12 @@ def main():
         with tarfile.open(sdist) as archive:
             for name in ("build.cmd", "scripts/build.py", "editors/vscode/package-lock.json"):
                 archive.getmember(f"pilotpatch-{version}/{name}")
-        outputs = [wheel, sdist, vsix, edge_zip]
+        outputs = [
+            ("Python install wheel", wheel),
+            ("Python source archive", sdist),
+            ("VS Code extension installer", vsix),
+            ("Edge extension ZIP", edge_zip),
+        ]
         if not options.no_office:
             office = stage / f"PilotPatch-Office-{version}.zip"
             build_office(python, stage, index, sdist, wheel, vsix, edge_zip, office)
@@ -260,11 +269,11 @@ def main():
             with office.open("rb") as stream:
                 digest = hashlib.file_digest(stream, "sha256").hexdigest()
             checksum.write_text(f"{digest}  {office.name}\n", encoding="ascii")
-            outputs.extend([office, checksum])
-        for path in outputs:
+            outputs.extend([("Offline Windows bundle", office), ("Bundle SHA-256", checksum)])
+        for label, path in outputs:
             target = artifacts / path.name
             path.replace(target)
-            print(target, flush=True)
+            print(f"{label} saved to {target}", flush=True)
 
 
 if __name__ == "__main__":

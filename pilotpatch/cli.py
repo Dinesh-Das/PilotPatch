@@ -370,8 +370,11 @@ async def dispatch(args) -> int:
         )
     private_directory(args.home)
     if command == "register-editor":
-        atomic_json(args.home / "editor-backend.json", {"python": str(Path(sys.executable))})
-        ui.event("Registered this backend for the PilotPatch editor extension.")
+        registration = args.home / "editor-backend.json"
+        atomic_json(registration, {"python": str(Path(sys.executable))})
+        ui.console.print(
+            f"Saved VS Code backend registration to {registration}", markup=False, soft_wrap=True
+        )
         return 0
     config = load_config(args.config_path or args.home / "config.yaml")
     overrides = config.model_dump()
