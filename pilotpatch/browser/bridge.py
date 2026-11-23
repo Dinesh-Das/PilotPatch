@@ -31,8 +31,7 @@ def pairing(home: Path, *, create=False) -> dict:
     if not path.exists():
         if not create:
             raise ProviderError(
-                "Existing Edge is not paired. Run 'pilotpatch connect' for one-time setup. "
-                "PilotPatch will not open another browser or profile."
+                "Set up Copilot in VS Code or run 'pilotpatch connect' to prepare Edge pairing."
             )
         private_directory(home)
         atomic_json(
@@ -193,6 +192,8 @@ class Bridge:
                     "not_ready": "Copilot is signed out, busy or unavailable. "
                     "Check the selected tab.",
                     "selected_tab_left_copilot": "The selected tab has left Copilot.",
+                    "selected_tab_closed": "The Copilot tab was closed. Open Copilot in Edge "
+                    "and click Use this tab in the PilotPatch extension.",
                 }
                 message = explanations.get(
                     data["error"],

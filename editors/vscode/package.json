@@ -2,7 +2,7 @@
   "name": "pilotpatch",
   "displayName": "PilotPatch",
   "description": "Prompt your workspace through the local Microsoft Copilot Web-only PilotPatch harness.",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "publisher": "pilotpatch-local",
   "license": "MIT",
   "repository": {
@@ -28,7 +28,7 @@
     "commands": [
       {"command": "pilotpatch.open", "title": "PilotPatch: Open Prompt Panel"},
       {"command": "pilotpatch.configure", "title": "PilotPatch: Select Backend Python"},
-      {"command": "pilotpatch.connect", "title": "PilotPatch: Connect Existing Edge"},
+      {"command": "pilotpatch.connect", "title": "PilotPatch: Set Up Copilot in Edge"},
       {"command": "pilotpatch.login", "title": "PilotPatch: Sign In to Microsoft Copilot"},
       {"command": "pilotpatch.probe", "title": "PilotPatch: Test Copilot Connection"},
       {"command": "pilotpatch.doctor", "title": "PilotPatch: Check Setup"}
@@ -40,12 +40,15 @@
       "properties": {
         "pilotpatch.pythonPath": {
           "type": "string", "default": "", "scope": "machine",
-          "description": "Absolute path to the Python executable where PilotPatch is installed (for example PilotPatch/.venv/Scripts/python.exe). Set in User Settings."
+          "description": "Optional absolute path to the installed backend Python. Windows setup registers a backend automatically. Set overrides in User Settings."
         }
       }
     }
   },
   "scripts": {"test": "node --test test/*.test.js"},
-  "files": ["src/**", "media/**", "README.md", "LICENSE"],
+  "files": [
+    "src/controller.js", "src/extension.js", "src/panel.js", "src/request.js",
+    "media/panel.css", "media/panel.js", "media/pilotpatch.svg", "README.md", "LICENSE"
+  ],
   "devDependencies": {}
 }

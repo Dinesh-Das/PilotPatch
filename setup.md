@@ -1,242 +1,103 @@
 # PilotPatch setup guide
 
-This guide covers PilotPatch **0.2.2** on Windows using **your current Edge profile
-and an existing Copilot tab**. Microsoft Copilot Web is the only runtime AI provider.
-The default connection leaves your Edge window and sign-in open when a task ends.
-
-Run the commands in **PowerShell**. Complete the extension installation, pairing and
-Microsoft sign-in steps manually. Commands that submit prompts are identified below.
-
-If the backend and VS Code extension are already installed, set the path variables
-in [section 1](#1-requirements-and-paths), then continue at
-[Connect your current Edge profile](#3-connect-your-current-edge-profile).
-
 ## 1. Requirements and paths
 
-Audited target: Windows 11 x64, 64-bit CPython 3.11–3.13, Git, current Microsoft Edge
-(120+), and a Microsoft Copilot account you are authorized to use. Python 3.14+ is
-excluded by this dependency lock; Windows 10 and ARM64 remain unverified. See the
-[office laptop checklist](docs/office-laptop.md) for portable paths and policy checks.
-VS Code or a compatible desktop fork is
-needed for the prompt panel. Node.js 20+ is needed only to build/test the extensions.
+Use Windows 11 x64, approved 64-bit CPython 3.11–3.13, Git and Microsoft Edge 120+.
+Use local VS Code for the prompt panel. The office guide covers device and account
+policy, portable paths and offline installation.
+[Office laptop checks](docs/office-laptop.md)
 
-For a new checkout, clone the GitHub repository first. Skip this command when the
-folder already contains your checkout. Private repository access requires your
-authorized GitHub account:
+Clone the repository or extract an approved office bundle on this laptop. Start
+PowerShell in that folder. Set the target project to a local folder you can access.
 
 ```powershell
-git clone 'https://github.com/Dinesh-Das/PilotPatch.git' 'D:\MyProjects\PilotPatch'
-```
-
-The examples use your existing checkout and target project. Change these two paths
-if you move either folder. Set these variables again in each new PowerShell window:
-
-```powershell
-$PilotPatchRoot = 'D:\MyProjects\PilotPatch'
-$TargetProject = 'D:\MyProjects\Birthday Bash'
+$PilotPatchRoot = (Get-Location).Path
+$TargetProject = 'C:\Work\YourProject'
 $PilotPatchPython = Join-Path $PilotPatchRoot '.venv\Scripts\python.exe'
 $PilotPatchCli = Join-Path $PilotPatchRoot 'copilot.cmd'
 $PilotPatchState = Join-Path $env:LOCALAPPDATA 'PilotPatch'
-$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.2.2.vsix'
-
-Set-Location -LiteralPath $PilotPatchRoot
+$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.2.3.vsix'
 ```
-
-Check the prerequisites and folders:
-
-```powershell
-py -3.12 --version
-git --version
-Test-Path -LiteralPath $PilotPatchRoot
-Test-Path -LiteralPath $TargetProject
-```
-
-Both folder checks should return `True`. If the Python launcher `py` is unavailable,
-use the full path to your Python executable in the manual installation below.
-Open your usual Edge window yourself; keep using the profile where Copilot works.
 
 ## 2. Install the Python backend
 
-Choose **one** installation method. Virtual environment activation is unnecessary;
-the commands call its Python executable directly.
-
-### Method A: setup script
-
 ```powershell
-Set-Location -LiteralPath $PilotPatchRoot
-.\setup-windows.ps1
+.\setup-windows.ps1 -InstallEditor
 ```
 
-To select a specific installed Python, replace the example path:
+This installs and checks the local Python environment, registers it with PilotPatch in
+VS Code, and installs the matching VSIX. If it is missing, the script builds it for
+you. Omit `-InstallEditor` for CLI-only setup. Use `-Python 'C:\Approved Python\python.exe'`
+if the script cannot find the approved interpreter. Setup reuses a working environment.
+If the environment was copied from another laptop, move it aside and rerun setup.
+
+For manual installation under workplace script restrictions:
 
 ```powershell
-.\setup-windows.ps1 -Python 'C:\Path\To\Python\python.exe'
-```
-
-The script creates `.venv`, installs binary wheels from `requirements.txt`, and installs
-PilotPatch from this checkout. It reuses a working local environment and otherwise
-selects an installed supported Python version. If an existing `.venv` is broken or
-copied from another laptop, setup stops before installing packages; recreate that
-environment locally. If PowerShell policy blocks the script, use Method B.
-
-### Method B: manual installation
-
-```powershell
-Set-Location -LiteralPath $PilotPatchRoot
 py -3.12 -I -m venv .venv
 & $PilotPatchPython -I -m pip install --only-binary=:all: -r (Join-Path $PilotPatchRoot 'requirements.txt')
 & $PilotPatchPython -I -m pip install --no-deps -e $PilotPatchRoot
+& $PilotPatchPython -I -m pilotpatch --project $PilotPatchRoot register-editor
 ```
 
-Without the Python launcher, replace only the environment creation command:
+For an extracted office bundle, install from the included wheels instead of the two
+online pip steps:
 
 ```powershell
-& 'C:\Path\To\Python\python.exe' -I -m venv (Join-Path $PilotPatchRoot '.venv')
+$PilotPatchWheels = Join-Path $PilotPatchRoot 'wheelhouse'
+& $PilotPatchPython -I -m pip install --no-index --find-links $PilotPatchWheels --only-binary=:all: -r (Join-Path $PilotPatchRoot 'requirements.txt')
+& $PilotPatchPython -I -m pip install --no-index --no-deps (Join-Path $PilotPatchRoot 'dist\pilotpatch-0.2.3-py3-none-any.whl')
 ```
 
-Confirm the installation without contacting Copilot:
-
-```powershell
-& $PilotPatchPython -m pip check
-& $PilotPatchCli --version
-& $PilotPatchCli --help
-& $PilotPatchCli --project $TargetProject doctor --offline
-```
-
-The version should be `PilotPatch 0.2.2`. The diagnostic output should include
-`"browser_connection": "existing-edge"`. If it shows `managed-edge`, change
-`browser_connection` in your operator configuration as described in section 7.
+If you installed manually, use **Extensions → … → Install from VSIX…** in VS Code
+and select the versioned file in `artifacts`. Build it with `build.cmd --no-office`
+if needed.
 
 ## 3. Connect your current Edge profile
 
-Stop an old PilotPatch Login/task process with **Ctrl+C** in its own terminal before
-starting another connection. Keep your regular Edge window open.
-
-Prepare the extension and private pairing file:
+In VS Code, open your local project and click **PilotPatch → Set up Copilot**.
+For CLI-only setup, run:
 
 ```powershell
 & $PilotPatchCli --project $TargetProject connect
 ```
 
-This prepares files locally. It does not launch Edge or create a browser profile.
-Print the two paths you will select in Edge:
+1. In the Edge profile you want to use, open `edge://extensions`. Enable **Developer
+   mode** and click **Load unpacked**. Paste or select the extension folder shown.
+   If PilotPatch is already installed, click **Reload** on its card.
+2. Open **PilotPatch** from Edge's Extensions menu and choose the pairing file if
+   asked. Open Copilot in that Edge profile and sign in. Click **Use this tab** in
+   the PilotPatch popup. Choose the intended tab when more than one is open.
 
-```powershell
-Join-Path $PilotPatchState 'edge-extension'
-Join-Path $PilotPatchState 'edge-pairing.json'
-```
-
-For this Windows account, the paths are:
-
-```text
-Extension folder: C:\Users\dines\AppData\Local\PilotPatch\edge-extension
-Pairing file:     C:\Users\dines\AppData\Local\PilotPatch\edge-pairing.json
-```
-
-Complete these steps **in your current Edge profile**:
-
-1. Open `edge://extensions` in that Edge window.
-2. Enable **Developer mode** and choose **Load unpacked**.
-3. Select the `edge-extension` folder printed above.
-4. Open the **PilotPatch — Existing Edge Connection** extension from Edge's Extensions menu.
-5. Under **Pair this profile**, select the printed `edge-pairing.json` file.
-6. Open or keep your normal Copilot chat at `https://copilot.com/chat`. Complete any
-   Microsoft sign-in and MFA yourself.
-7. In the PilotPatch extension, choose that Copilot tab and click **Connect this tab**.
-
-Keep the pairing file private. It is a local connection secret, not a Microsoft
-password or cookie. The extension reads it locally; there is no upload step.
-
-Pairing persists across CLI runs. **Select the tab again after restarting Edge.**
-Keep the selected tab open and send or clear any unsent draft manually before a task.
-Stop a running task before changing the selected tab.
+The VS Code panel can copy either path. Keep the pairing file private. Pairing
+persists, and you confirm the tab again after restarting Edge. Stop a running task
+before changing tabs.
 
 ## 4. Verify sign-in and a real Copilot reply
 
-Run these commands **one at a time**, waiting for each to finish:
+In VS Code, click **Test connection**. From the CLI:
 
 ```powershell
-& $PilotPatchCli --project $TargetProject --browser-connection existing-edge login
-& $PilotPatchCli --project $TargetProject --browser-connection existing-edge status
-& $PilotPatchCli --project $TargetProject --browser-connection existing-edge probe
+& $PilotPatchCli --project $TargetProject probe
 ```
 
-What they establish:
+The test sends a short random marker with no project files and checks the reply.
+Edge can take about 30 seconds to reconnect. Click **Reconnect** in the Edge popup
+while the test waits to wake it immediately. If the test fails, follow the terminal
+message. **Check Microsoft sign-in** in the panel or `login` in the CLI diagnoses
+account controls. `status` checks chat readiness without submitting a prompt.
 
-| Command | Expected result |
-| --- | --- |
-| `login` | Detects public signed-in account controls; waits for manual authentication if needed. |
-| `status` | Reports `authenticated: true` and `chat_ready: true` when the selected tab is ready. |
-| `probe` | Sends a harmless random marker to Copilot and verifies its complete reply. |
+## 5. Run from the prompt panel
 
-`status` reports `connection_verified: false` because checking controls does not
-submit a model prompt. **A successful `probe` is the live communication check.** It
-does not upload repository source. The extension's **ON** badge means local transport
-is connected; it does not establish that Copilot can answer.
+When connection testing succeeds, enter a task and click **Run task** or press
+**Ctrl+Enter**. Review source sharing, diffs, command permissions and actual results
+in the terminal. **Task options** contains the permission mode and **Preview only**.
+**Troubleshooting** contains **Check this laptop** and setup recovery.
 
-The extension normally reconnects within about 30 seconds of starting a CLI command.
-While the command is waiting, open its popup and click **Connect this tab** to wake it.
-
-## 5. Install the VS Code or fork prompt panel
-
-The VSIX must exist first:
-
-```powershell
-Test-Path -LiteralPath $PilotPatchVsix
-```
-
-If this returns `False`, build the VSIX using section 10. Generated packages are not
-tracked in Git, so a fresh Git checkout may not contain one.
-
-For VS Code, if `code` is available on PATH:
-
-```powershell
-code --install-extension $PilotPatchVsix --force
-code --reuse-window $TargetProject
-```
-
-For this machine's VS Code installation, the absolute-path equivalent is:
-
-```powershell
-$VSCodeCli = Join-Path $env:LOCALAPPDATA 'Programs\Microsoft VS Code\bin\code.cmd'
-& $VSCodeCli --install-extension $PilotPatchVsix --force
-& $VSCodeCli --reuse-window $TargetProject
-```
-
-For Cursor, if its CLI is available, use this **instead of** the VS Code commands:
-
-```powershell
-cursor --install-extension $PilotPatchVsix --force
-cursor $TargetProject
-```
-
-Other compatible desktop forks can use **Extensions → … → Install from VSIX…**.
-Remote/WSL windows and untrusted workspaces are not supported by this local backend.
-
-In your chosen editor:
-
-1. If you updated an already installed extension, run **Developer: Reload Window**.
-2. Run **PilotPatch: Open Prompt Panel** from the command palette.
-3. Choose **Select backend Python** and select:
-   `D:\MyProjects\PilotPatch\.venv\Scripts\python.exe`.
-4. Confirm the panel shows the target project you want to change.
-5. Use **Connect existing Edge** if you have not completed section 3.
-6. Use **Sign in**, then **Test connection**. Let each terminal task finish.
-7. Enter a task and click **Run task**, or press **Ctrl+Enter**.
-
-The equivalent **User Settings JSON** entry is:
-
-```json
-{
-  "pilotpatch.pythonPath": "D:\\MyProjects\\PilotPatch\\.venv\\Scripts\\python.exe"
-}
-```
-
-Set this in User Settings; workspace settings cannot select the executable. Source
-sharing, diffs and command approvals appear in the integrated terminal. The panel's
-**Finished** state means the process exited successfully; inspect the actual report
-to see which files changed and which checks ran.
-
+For Cursor and compatible local desktop forks, run the setup command without
+`-InstallEditor` and load the same VSIX through **Install from VSIX…**. The
+registered backend is shared by editors under the current Windows user.
+`pilotpatch.pythonPath` in User Settings can override the registered backend.
 ## 6. Run tasks from PowerShell
 
 These commands submit selected source/context to Microsoft Copilot after your
@@ -401,95 +262,41 @@ sign-out remains a manual action in Copilot/Edge.
 
 ## 9. Update an existing installation
 
-Stop PilotPatch tasks first. After obtaining the updated source in this checkout:
-
-```powershell
-Set-Location -LiteralPath $PilotPatchRoot
-& $PilotPatchPython -I -m pip install --only-binary=:all: -r (Join-Path $PilotPatchRoot 'requirements.txt')
-& $PilotPatchPython -I -m pip install --no-deps -e $PilotPatchRoot
-& $PilotPatchCli --version
-& $PilotPatchCli connect
-```
-
-In your current Edge, open `edge://extensions` and click **Reload** for the PilotPatch
-extension. Existing pairing is reused unless you previously logged out. Select your
-tab again if needed. Install the matching rebuilt VSIX and reload the editor:
-
-```powershell
-code --install-extension $PilotPatchVsix --force
-```
-
-Finally rerun `login`, `status` and `probe` from section 4. An already running Python
-task cannot load new connector code until it is restarted.
-
-Version 0.2.1 and later require Edge extension protocol 2. A previous extension is rejected
-before it receives a prompt; run `connect`, **Reload** the Edge extension and select
-the tab again. Existing Copilot tabs stay open. A reply requires a distinct message-level
-completion control such as **Copy message**; generic Copy/code-copy buttons do not count.
+Stop your PilotPatch tasks. Get the updated source or extract the new office bundle,
+then rerun `.\setup-windows.ps1 -InstallEditor`. Reload VS Code if prompted. In the
+PilotPatch panel click **Set up Copilot** or **Set up or repair Edge**. In
+`edge://extensions`, reload the PilotPatch card. Return to the Edge popup, click
+**Use this tab** and rerun **Test connection** in VS Code.
 
 ## 10. Development, tests and packages
 
-Run this section only when developing PilotPatch or building missing packages.
-These commands run repository test/build code and install development dependencies.
-Install Node.js 20+ before running the full Python suite too: some Python tests render
-the editor panel through Node. Use either the direct development install below or
-`./setup-windows.ps1 -Dev` from the checkout.
+From the checkout root:
 
 ```powershell
-Set-Location -LiteralPath $PilotPatchRoot
-& $PilotPatchPython -m pip install -e ($PilotPatchRoot + '[dev]')
+.\setup-windows.ps1 -Dev
 & $PilotPatchPython -m playwright install chromium
 & $PilotPatchPython -m pytest -q
 & $PilotPatchPython -m ruff check .
 & $PilotPatchPython -m ruff format --check .
-& $PilotPatchPython -m pip check
-```
-
-The Chromium download is for isolated extension test fixtures. Normal existing-Edge
-runtime does not need a Playwright browser download. Offline tests use local HTML
-fixtures or test-only providers; they do not validate your live Microsoft account.
-
-Run the JavaScript checks, with Node.js 20+ installed:
-
-```powershell
-node --version
-npm --version
 node --test tests/edge_connection.test.cjs
-npm --prefix editors/vscode test
+node --test editors/vscode/test/*.test.js
+.\build.cmd
 ```
 
-Build the Python wheel and source distribution, and audit locked dependencies:
+Node.js 20+ and the Playwright Chromium download are only needed for development
+checks. The build uses Python and creates all packages under `artifacts`. Use
+`--no-office` for a quick build or `--wheelhouse PATH` for approved local wheels.
+The offline bundle contains the matching wheel, VSIX and runtime wheels for Windows
+x64 Python 3.11–3.13.
 
-```powershell
-& $PilotPatchPython -m build
-& $PilotPatchPython -m pip_audit -r requirements.txt
-Get-ChildItem -LiteralPath (Join-Path $PilotPatchRoot 'dist')
-```
-
-Build the VSIX:
-
-```powershell
-New-Item -ItemType Directory -Path (Join-Path $PilotPatchRoot 'artifacts') -Force | Out-Null
-Push-Location (Join-Path $PilotPatchRoot 'editors\vscode')
-try {
-    npm exec --ignore-scripts --package=@vscode/vsce -- vsce package --no-dependencies --out $PilotPatchVsix
-}
-finally {
-    Pop-Location
-}
-```
-
-For explicitly authorized live-account acceptance testing, finish pairing and the
-probe first, then run the following separately. These tests submit real model prompts
-and include reads/edits/test execution in a temporary sample project:
+After pairing and checking the real Copilot reply, explicitly authorized
+live-account validation runs as a separate suite:
 
 ```powershell
 & $PilotPatchPython -m pytest -m live --live --live-login -s
 ```
 
-Live test results must be reported separately from offline tests. See
-[docs/validation.md](docs/validation.md) for the recorded validation scope.
-
+[Validation scope](docs/validation.md)
 ## 11. Troubleshooting
 
 Start with the offline diagnostic; use the full diagnostic to attach to your selected
@@ -502,18 +309,18 @@ tab without submitting a model prompt:
 
 | Symptom | Action |
 | --- | --- |
-| Python opens the Microsoft Store or is missing | Use the installed Python's full path with setup Method A or B. |
+| Python opens the Microsoft Store or is missing | Use the approved Python executable with the -Python setup option. |
 | Python 3.14+ or 32-bit Python is installed | Select approved 64-bit CPython 3.11–3.13 with `-Python`; this lock does not require compiling native dependencies. |
 | Copied `.venv` does not start | Recreate it on this laptop; transfer source/packages, not virtual environments or private state. |
-| `code` or `cursor` is not recognized | Use the absolute VS Code CLI above or Install from VSIX in your editor. |
+| `code` or `cursor` is not recognized | Use Install from VSIX in your editor. |
 | Existing Edge is not paired | Run `connect`, load the unpacked extension in the current profile, then choose the pairing file and tab. |
-| No existing Edge tab connected | Keep Edge open. Check that the extension is enabled in that profile, choose the tab, click Connect while the CLI waits. |
+| No existing Edge tab connected | Keep Edge open. Check that the extension is enabled in that profile, choose the tab, click Reconnect while the CLI waits. |
 | Another PilotPatch browser task is active | Finish it or stop that specific task with Ctrl+C; then retry. |
 | Copilot is signed in but account controls are unrecognized | Open Copilot's own account menu so its Sign out/account controls are visible, then retry `login` or `status`. |
 | `service_error` or the red request-failed banner | Inspect/refresh the Copilot tab manually, confirm normal chat works, then rerun `status` and `probe`. Re-pairing alone does not prove the service recovered. |
 | Unsent draft in the selected tab | Send or clear that draft yourself. PilotPatch preserves it instead of overwriting it. |
 | A turn was interrupted by navigation, reload or another user message | Inspect the tab and local history. Start a fresh chat and resume after reviewing unknown outcomes. |
-| Edge restarted | Choose your Copilot tab again in the extension; pairing remains saved. |
+| Edge restarted | Click Use this tab again in the extension; pairing remains saved. |
 | Extension files were updated but behavior is unchanged | Run `connect`, reload the Edge extension, restart the old CLI task, then reselect the tab. |
 | Port 57423 is in use | Stop the known PilotPatch task using it. If necessary, change the port in the private pairing file and select that file again in the extension. |
 

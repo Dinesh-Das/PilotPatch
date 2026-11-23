@@ -38,6 +38,7 @@ def ps_quote(value):
 def test_setup_reaches_installer_with_supported_python_under_powershell51(tmp_path):
     script = tmp_path / "setup-windows.ps1"
     shutil.copyfile(ROOT / script.name, script)
+    shutil.copyfile(ROOT / "pyproject.toml", tmp_path / "pyproject.toml")
     # Existing interpreter deliberately has no pip: reach that stage without
     # contacting a package index or executing package installation in this test.
     import venv

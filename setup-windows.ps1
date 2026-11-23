@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$Python,
-    [switch]$Dev
+    [switch]$Dev,
+    [switch]$InstallEditor
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = $PSScriptRoot
@@ -13,7 +14,7 @@ $pythonCheck = "import sys; assert (3,11) <= sys.version_info < (3,14) and sys.m
 function Invoke-Checked {
     param([string]$Executable, [string[]]$Arguments)
     & $Executable @Arguments
-    if ($LASTEXITCODE -ne 0) { throw "Command failed with exit code $LASTEXITCODE" }
+    if ($LASTEXITCODE -ne 0) { throw "Setup step failed ($LASTEXITCODE). See the error immediately above." }
 }
 
 if (Test-Path -LiteralPath $venvPython) {
@@ -49,11 +50,37 @@ Invoke-Checked $Python @('-I', '-c', $pythonCheck)
 if (-not (Test-Path -LiteralPath $venvPython)) {
     Invoke-Checked $Python @('-I', '-m', 'venv', $venvRoot)
 }
-Invoke-Checked $venvPython @('-I', '-m', 'pip', 'install', '--only-binary=:all:', '-r', (Join-Path $projectRoot 'requirements.txt'))
-if ($Dev) {
+$projectFile = Join-Path $projectRoot 'pyproject.toml'
+$readVersion = "import sys,tomllib; print(tomllib.load(open(sys.argv[1], 'rb'))['project']['version'])"
+$version = Invoke-Checked $venvPython @('-I', '-c', $readVersion, $projectFile)
+$wheelhouse = Join-Path $projectRoot 'wheelhouse'
+$wheel = Join-Path $projectRoot "dist\pilotpatch-$version-py3-none-any.whl"
+$index = @()
+if ((Test-Path -LiteralPath $wheelhouse) -and (Test-Path -LiteralPath $wheel) -and -not $Dev) {
+    Write-Host 'Installing from the included Windows wheel bundle.'
+    $index = @('--no-index', '--find-links', $wheelhouse)
+}
+Invoke-Checked $venvPython (@('-I', '-m', 'pip', 'install') + $index + @('--only-binary=:all:', '-r', (Join-Path $projectRoot 'requirements.txt')))
+if ($index.Count) {
+    Invoke-Checked $venvPython (@('-I', '-m', 'pip', 'install') + $index + @('--no-deps', $wheel))
+} elseif ($Dev) {
     Invoke-Checked $venvPython @('-I', '-m', 'pip', 'install', '-e', "$projectRoot[dev]")
 } else {
     Invoke-Checked $venvPython @('-I', '-m', 'pip', 'install', '--no-deps', '-e', $projectRoot)
+}
+Invoke-Checked $venvPython @('-I', '-m', 'pip', 'check')
+Invoke-Checked $venvPython @('-I', '-m', 'pilotpatch', '--project', $projectRoot, 'register-editor')
+if ($InstallEditor) {
+    $editor = Get-Command code.cmd -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $editor) {
+        throw 'VS Code CLI was not found. Install approved VS Code, reopen PowerShell, then rerun setup with -InstallEditor.'
+    }
+    $vsix = Join-Path $projectRoot "artifacts\pilotpatch-$version.vsix"
+    if (-not (Test-Path -LiteralPath $vsix)) {
+        Invoke-Checked $venvPython @('-I', (Join-Path $projectRoot 'scripts\build.py'), '--no-office')
+    }
+    Invoke-Checked $editor.Source @('--install-extension', $vsix)
+    Write-Host 'Open your project in VS Code, click PilotPatch, then choose Set up Copilot.'
 }
 $edgeCandidates = @(
     (Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'),
@@ -63,9 +90,8 @@ $edgeCandidates = @(
 if (-not ($edgeCandidates | Where-Object { Test-Path -LiteralPath $_ })) {
     Write-Warning 'Microsoft Edge was not found. Install it through your approved software channel.'
 }
-Write-Host "PilotPatch installed. No browsers or system settings were changed."
-Write-Host "Run: & '$projectRoot\copilot.cmd' connect"
-Write-Host "Pair the extension with your current Edge profile, then run login."
-Write-Host "Then: & '$projectRoot\copilot.cmd' probe"
-Write-Host "To use copilot-agent anywhere in this PowerShell session:"
-Write-Host ('$env:Path = "' + $venvRoot + '\Scripts;' + '$env:Path"')
+Write-Host 'PilotPatch backend installed.'
+if (-not $InstallEditor) {
+    Write-Host 'For VS Code, rerun setup with -InstallEditor.'
+    Write-Host "For the command line, run: & '$projectRoot\copilot.cmd' connect"
+}

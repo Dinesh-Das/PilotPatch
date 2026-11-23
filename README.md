@@ -1,140 +1,59 @@
 # PilotPatch
 
-A local coding agent whose **only runtime reasoning engine is Microsoft Copilot Web**.
-Copilot requests local exploration, proposes guarded edits, runs approved tests and
-iterates on failures. PilotPatch supplies deterministic Python orchestration.
+PilotPatch is a local coding assistant for Windows. It uses Microsoft Copilot Web to
+explain a project, propose edits and run checks you approve. Source sharing, edit approval
+and command approval happen in the terminal.
 
-**Status:** implemented with offline and local Edge tests. A real authorized Microsoft
-session is required to validate account-bound workflows. See [validation](docs/validation.md).
-No fake connector or alternative model is selectable at runtime.
-The latest [audit report](docs/audit-2026-11-09.md) records office-laptop fixes and validation limits.
-Use the [office laptop checklist](docs/office-laptop.md) when moving to a managed Windows device.
+## Start in VS Code
 
-Source: [Dinesh-Das/PilotPatch](https://github.com/Dinesh-Das/PilotPatch).
-See [contribution instructions](CONTRIBUTING.md) for the local workflow and checks.
-
-## Windows setup
-
-See [setup.md](setup.md) for the complete PowerShell setup, existing Edge pairing,
-VS Code/fork installation, task commands, recovery and troubleshooting guide.
-
-Audited target: Windows 11 x64, **64-bit CPython 3.11–3.13**, Git and current Microsoft
-Edge (120+). Python 3.14+ is excluded by the dependency lock. Windows 10 and ARM64 are
-unverified. No administrator rights, Docker, WSL, API keys or background service required.
+From the PilotPatch folder in PowerShell:
 
 ```powershell
-cd D:\MyProjects\PilotPatch
-.\setup-windows.ps1
-# If needed: .\setup-windows.ps1 -Python 'C:\Path to Python\python.exe'
-.\copilot.cmd connect
-# Follow the one-time existing-Edge extension setup printed by connect.
-.\copilot.cmd login
-.\copilot.cmd status
-.\copilot.cmd probe
+.\setup-windows.ps1 -InstallEditor
 ```
 
-Setup creates `.venv`, installs dependencies and the local package. It does not install
-or replace Edge, modify script execution policy or change system settings. Use your
-approved package index/proxy. If scripts are restricted, install manually:
+1. Open your project folder in VS Code. Click **PilotPatch** in the activity bar.
+2. Click **Set up Copilot** and follow the two Edge steps in the panel. In Edge, open
+   Copilot, sign in, and click **Use this tab** in the PilotPatch extension.
+3. Return to VS Code and click **Test connection**. When Copilot replies, enter
+   a task and click **Run task**.
+
+The setup command installs Python dependencies, registers the backend with the
+editor, and builds the VSIX automatically if it is missing. You need Windows 11 x64,
+approved 64-bit CPython 3.11–3.13, Git, Edge 120+ and local VS Code. See setup for
+Cursor, CLI-only installation and restricted PowerShell.
+[Full setup guide](setup.md)
+
+## Build everything
 
 ```powershell
-py -3.12 -I -m venv .venv
-.\.venv\Scripts\python.exe -I -m pip install --only-binary=:all: -r requirements.txt
-.\.venv\Scripts\python.exe -I -m pip install --no-deps -e .
+.\build.cmd
 ```
 
-To use both `pilotpatch` and `copilot-agent` anywhere in the current PowerShell session:
-
-```powershell
-$env:Path = "D:\MyProjects\PilotPatch\.venv\Scripts;$env:Path"
-cd 'C:\Office\Backend'
-copilot-agent "Explore this project and explain its architecture."
-copilot-agent --project 'C:\Office\Frontend' "Add a reusable table component and tests."
-```
-
-Alternatively call `D:\MyProjects\PilotPatch\copilot.cmd` by absolute path. Your current
-working directory remains the target repository.
-
-## Prompt from VS Code or Cursor
-
-An optional desktop extension adds a dedicated **PilotPatch** activity-bar panel.
-The panel launches the same Python harness for your selected local workspace; its
-prompts still go exclusively to Microsoft Copilot Web. Source-sharing consent,
-diffs, command approvals and actual output remain in the integrated task terminal.
-
-1. Install `artifacts/pilotpatch-0.2.2.vsix` through **Extensions → … → Install from VSIX…**.
-2. Run **PilotPatch: Open Prompt Panel** from the command palette.
-3. Click **Select backend Python** and select this installation's
-   `.venv\Scripts\python.exe` (for this checkout: `D:\MyProjects\PilotPatch\.venv\Scripts\python.exe`).
-4. Click **Connect existing Edge** and follow its one-time installation/pairing steps.
-   Select your already-open Copilot tab in the extension in your current Edge profile.
-5. Use **Sign in** and **Test connection**, then enter a task and choose **Run task**.
-   Ctrl/Cmd+Enter also submits the prompt.
-
-**Permissions** selects approve/read-only/auto-edit; **Preview only** passes dry-run.
-**Change** selects a project in multi-root workspaces. **Stop task** stops only the
-owned editor task; inspect backend session state before resuming partial work.
-The editor's built-in AI chat remains separate. No model API, fallback provider or
-remote AI service is introduced. The backend uses a temporary authenticated loopback
-connection to the Edge extension. Remote/WSL hosts and untrusted workspaces are blocked.
-
-Verified with VS Code 1.141.2 and Cursor 3.20.17 (VS Code API 1.128.0) using real
-extension hosts and an actual backend diagnostic process. Other compatible forks can
-install the same VSIX; compatibility must be checked in the particular fork/version.
-See [editor extension instructions](editors/vscode/README.md) for setup, packaging
-and security details. Node.js is required only for editor-extension development/tests.
+Look in `artifacts` for the Python wheel and source archive, VSIX, Edge ZIP and Windows
+offline bundle. The build uses Python and your approved Python package index. For a
+local index, use `--wheelhouse PATH`. Use `--no-office` to skip the offline bundle.
+[Contributor checks](CONTRIBUTING.md)
 
 ## Account and data destination
 
-The default connection uses **your existing Edge profile and selected Copilot tab**.
-Run `connect` once, then in that Edge profile open `edge://extensions`, enable
-Developer mode, choose **Load unpacked** and select the folder printed by `connect`.
-Open the PilotPatch extension, choose the printed `edge-pairing.json` file, select
-your Copilot tab and click **Connect this tab**. This follows Edge's documented
-[local extension installation](https://learn.microsoft.com/en-us/microsoft-edge/extensions/getting-started/extension-sideloading).
+Use an authorized Microsoft Copilot Web account in your current Edge profile.
+The Edge popup highlights the only open Copilot tab and asks you to confirm it.
+When several Copilot tabs are open, choose the intended one. Confirm the tab again
+after restarting Edge. Keep it open with an empty message box while a task runs.
 
-`login` checks that selected tab and waits for manual sign-in/MFA there only if needed.
-It never launches a browser/profile or substitutes another tab. Closing a task leaves
-Edge, your tabs and Microsoft sign-in intact. Keep the selected tab open; finish or
-clear any unsent draft manually before starting a task. Pairing persists across runs.
-Select the tab again after restarting Edge; session-only selection prevents tab ID reuse.
-The extension reconnects within about 30 seconds; opening its popup and clicking
-Connect wakes it immediately when the local backend is available.
+**Test connection** sends a short random marker and verifies the whole reply without
+sharing project files. The **ON** badge only shows that the local bridge is active.
+Managed devices may prohibit loading the Edge extension or contacting Copilot.
+[Office laptop setup and acceptance](docs/office-laptop.md)
 
-PilotPatch never asks for passwords, imports profiles, exports cookies or bypasses
-authentication. `status` requires a visible signed-in account control and a single
-composer; a chat box or browser profile portrait alone is insufficient. Open Copilot's
-account menu if needed; a visible **Sign out** control also proves sign-in.
+Microsoft's personal Copilot terms restrict automated access and exclude work or Entra
+accounts. Check the terms and policy for the account you intend to use. Microsoft 365
+Copilot and GitHub Copilot are distinct services.
+[Microsoft Copilot terms](https://www.microsoft.com/en-us/microsoft-copilot/for-individuals/termsofuse)
 
-`probe` submits a harmless random nonce and verifies the full reply without uploading
-source. It tests that session, not a complete coding workflow or office data authorization.
-
-Use `https://copilot.com/chat` in your current Edge profile. No debugging port or
-profile copying is needed. See [connection details](editors/edge/README.md).
-
-Status reports `authenticated`, `chat_ready` and `connection_verified` separately.
-Sign-in detection does not verify a model reply. `service_error` means the page is
-showing a request failure, even when the account is signed in. `status` exits 2 when
-chat is not ready; `probe` is the actual prompt/reply connectivity check. A failed
-request is never automatically refreshed or resubmitted.
-
-After updating an already running Login task, stop that old task once with Ctrl+C,
-then complete `connect` setup and choose **Sign in** again. The old Python process
-cannot load a new connector while running. Install the 0.2.2 VSIX for the panel;
-the CLI `connect` command also works with older panel versions.
-
-The former dedicated profile is available only by explicit opt-in:
-`copilot-agent --browser-connection managed-edge login`, or set
-`browser_connection: managed-edge` in operator-owned config. There is no automatic
-fallback to this mode. Existing dedicated profiles are left intact during the upgrade.
-
-Microsoft's [personal Copilot terms](https://www.microsoft.com/en-us/microsoft-copilot/for-individuals/termsofuse)
-prohibit automated access and explicitly exclude work/Entra accounts. Verify the
-applicable enterprise agreements and organization policy for your actual account.
-This browser adapter is unofficial. Microsoft 365 Copilot and GitHub Copilot are
-distinct services. No enterprise API connector is shipped because tenant licensing,
-registration and consent were unavailable; see [research](docs/research.md).
-
+See the latest audit for what was verified locally and which checks require your actual
+office device and account. [November 24 audit](docs/audit-2026-11-24.md)
 ## Coding workflow
 
 ```powershell

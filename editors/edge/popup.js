@@ -1,50 +1,98 @@
 "use strict";
 const $ = id => document.getElementById(id);
-async function listTabs() {
-  const {tabId} = await chrome.storage.session.get("tabId");
-  const tabs = await chrome.tabs.query({url: ["https://copilot.com/*", "https://copilot.microsoft.com/*", "https://copilot.ai/*"]});
+const tabPatterns = ["copilot.com", "copilot.microsoft.com", "copilot.ai"].map(host => `https://${host}/*`);
+let busy = false;
+let renderId = 0;
+let chosenId = "";
+let profileClient;
+
+async function render() {
+  const id = ++renderId;
+  const [{pair, client}, selection, tabs] = await Promise.all([
+    chrome.storage.local.get(["pair", "client"]),
+    chrome.storage.session.get(["tabId", "selection", "selectedClient", "connectedSelection"]),
+    chrome.tabs.query({url: tabPatterns})
+  ]);
+  if (id !== renderId) return;
+  if (!pair || client !== profileClient) chosenId = "";
+  profileClient = client;
+  const eligible = tabs.filter(tab => PilotPatchConnection.isCopilot(tab.url));
+  const selected = eligible.find(tab => tab.id === selection.tabId && selection.selectedClient === client);
   $("tabs").replaceChildren(new Option("Choose a Copilot tab", ""));
-  for (const tab of tabs.filter(tab => PilotPatchConnection.isCopilot(tab.url))) {
-    $("tabs").add(new Option(`${tab.title || "Copilot"} — tab ${tab.id}`, String(tab.id)));
+  for (const [index, tab] of eligible.entries()) {
+    const host = new URL(tab.url).hostname;
+    $("tabs").add(new Option(`${tab.title || "Copilot"} · ${host} · ${index + 1}`, String(tab.id)));
   }
-  $("tabs").value = String(tabId ?? "");
-  if (!tabs.length) $("status").textContent = "Open Copilot in this Edge profile, then refresh this list.";
+  if (eligible.some(tab => String(tab.id) === chosenId)) $("tabs").value = chosenId;
+  else if (selected || eligible.length === 1) $("tabs").value = String((selected || eligible[0]).id);
+
+  $("pair-step").hidden = Boolean(pair);
+  $("tab-step").hidden = !pair;
+  $("choose").hidden = eligible.length < 2;
+  $("open").hidden = eligible.length > 0;
+  $("connect").hidden = !eligible.length;
+  $("disconnect").hidden = !pair;
+  $("connect").disabled = busy || !$("tabs").value;
+  $("pair").disabled = busy;
+  $("disconnect").disabled = busy;
+  const connected = selected && selection.connectedSelection === selection.selection;
+  $("status").textContent = !pair ? "Waiting for pairing file" :
+    connected ? "Connected to PilotPatch" : selected ? "Tab selected" :
+      eligible.length ? "Choose the tab PilotPatch can use" : "Open Copilot to continue";
+  $("tab-help").textContent = connected ? "You can return to VS Code. Keep this Copilot tab open." :
+    selected ? "In VS Code, click Test connection. Edge may take up to 30 seconds to connect." :
+      eligible.length === 1 ? `Use ${eligible[0].title || "the open Copilot tab"}, then return to VS Code.` :
+        eligible.length ? "Choose the tab signed into the account you want to use." :
+          "Sign in on the Copilot website, then open this extension again.";
+  $("connect").textContent = selected && String(selected.id) === $("tabs").value ?
+    "Reconnect" : "Use this tab";
 }
-async function init() {
-  await chrome.storage.local.setAccessLevel({accessLevel: "TRUSTED_CONTEXTS"});
-  const {pair} = await chrome.storage.local.get("pair");
-  $("paired").textContent = pair ? "This profile is paired." : "Select your pairing file to begin.";
-  await listTabs();
+
+async function update() {
+  try { await render(); }
+  catch { $("error").textContent = "PilotPatch could not read Edge settings. Reload the extension and try again."; }
 }
-$("pair").addEventListener("change", async () => {
+
+async function act(getMessage) {
+  if (busy) return;
+  busy = true;
+  $("error").textContent = "";
+  $("pair").disabled = $("connect").disabled = $("disconnect").disabled = true;
   try {
-    const file = $("pair").files[0];
-    if (!file || file.size > 4096) throw new Error("Choose a valid PilotPatch pairing file.");
-    const pair = PilotPatchConnection.validatePair(JSON.parse(await file.text()), chrome.runtime.id);
-    await chrome.storage.session.clear();
-    await chrome.storage.local.set({pair});
-    $("paired").textContent = "This profile is paired. Choose your Copilot tab below.";
-  } catch { $("paired").textContent = "Invalid pairing file. Run pilotpatch connect and select edge-pairing.json."; }
+    const reply = await chrome.runtime.sendMessage(await getMessage());
+    if (!reply?.ok) throw new Error(reply?.error || "Reload the PilotPatch extension and try again.");
+  } catch (error) { $("error").textContent = error.message; }
+  finally {
+    busy = false;
+    await update();
+  }
+}
+
+$("pair").addEventListener("change", () => {
+  const file = $("pair").files[0];
+  $("pair").value = "";
+  if (!file) return;
+  void act(async () => {
+    try {
+      if (file.size > 4096) throw new Error();
+      const pair = PilotPatchConnection.validatePair(JSON.parse(await file.text()), chrome.runtime.id);
+      return {type: "pair", pair};
+    } catch {
+      throw new Error("Choose edge-pairing.json from Set up Copilot in VS Code.");
+    }
+  });
 });
-$("refresh").addEventListener("click", () => { void listTabs(); });
-$("connect").addEventListener("click", async () => {
-  try {
-    const {pair, client} = await chrome.storage.local.get(["pair", "client"]);
-    if (!pair) throw new Error("Pair this profile first.");
-    if (!$("tabs").value) throw new Error("Choose an existing Copilot tab.");
-    const tabId = Number($("tabs").value);
-    const tab = await chrome.tabs.get(tabId);
-    if (!PilotPatchConnection.isCopilot(tab.url)) throw new Error("The selected tab has left Copilot.");
-    await chrome.storage.local.set({client: client || crypto.randomUUID()});
-    await chrome.storage.session.set({tabId, selection: crypto.randomUUID()});
-    await chrome.runtime.sendMessage({type: "wake"});
-    $("status").textContent = "Tab selected. Run Sign in or Test connection in PilotPatch. Keep this tab open.";
-  } catch (error) { $("status").textContent = error.message; }
+$("tabs").addEventListener("change", () => {
+  chosenId = $("tabs").value;
+  void update();
 });
-$("disconnect").addEventListener("click", async () => {
-  await chrome.storage.local.remove(["pair", "client", "tabId"]);
-  await chrome.storage.session.clear();
-  // Stopping the worker also stops any loop holding the old in-memory pairing.
-  chrome.runtime.reload();
+$("connect").addEventListener("click", () => void act(() => ({
+  type: "select", tabId: Number($("tabs").value)
+})));
+$("disconnect").addEventListener("click", () => void act(() => ({type: "disconnect"})));
+chrome.tabs.onUpdated.addListener((_, change) => {
+  if (change.url || change.title || change.status === "complete") void update();
 });
-void init();
+chrome.tabs.onRemoved.addListener(update);
+chrome.storage.onChanged.addListener(update);
+void update();

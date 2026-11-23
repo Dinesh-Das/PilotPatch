@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.3 — 2026-11-24
+
+- Build the wheel, source distribution, VSIX, Edge ZIP and offline Windows bundle
+  with `build.cmd` from a clean checkout. Packaging requires Python only.
+- Windows setup registers its Python backend with the editor and can build and install
+  the VS Code extension using `-InstallEditor`. Extracted office bundles install from included wheels.
+- VS Code shows the next setup step, copies the two paths Edge asks for, and says when
+  Copilot has actually replied. Task options and recovery tools are grouped separately.
+- Edge shows only the next pairing step, offers a single confirmation when only one
+  Copilot tab is open, and avoids clearing a fresh selection when updating pairing.
+- Pass dash-prefixed editor prompts as literal text and give clearer connection errors.
+
 ## 0.2.2 — 2026-11-09
 
 - Isolate backend imports in Windows launchers and editor tasks; project modules and

@@ -3,6 +3,7 @@
 importScripts("connection.js");
 let running = false;
 let wakeRequested = false;
+let popupAction = Promise.resolve();
 const ready = chrome.storage.local.setAccessLevel({accessLevel: "TRUSTED_CONTEXTS"});
 
 async function post(pair, auth, path, body) {
@@ -29,7 +30,8 @@ async function post(pair, auth, path, body) {
 }
 
 async function operate(tabId, command, selected, authorizeCommit) {
-  const tab = await chrome.tabs.get(tabId);
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab) throw new Error("selected_tab_closed");
   if (!PilotPatchConnection.isCopilot(tab.url)) {
     if (command.action === "status") return {
       authenticated: false, chat_ready: false, state: "manual_authentication_required",
@@ -64,11 +66,15 @@ async function operate(tabId, command, selected, authorizeCommit) {
 async function pump() {
   if (running) return;
   running = true;
+  let connected = false;
   try {
     await ready;
     const {pair, client} = await chrome.storage.local.get(["pair", "client"]);
-    const {tabId, selection} = await chrome.storage.session.get(["tabId", "selection"]);
-    if (!pair || !client || !selection || !Number.isInteger(tabId)) return;
+    const {tabId, selection, selectedClient} = await chrome.storage.session.get(
+      ["tabId", "selection", "selectedClient"]
+    );
+    if (!pair || !client || client !== selectedClient || !selection || !Number.isInteger(tabId)) return;
+    if (!await chrome.tabs.get(tabId).catch(() => null)) return;
     const identity = {client: `${client}:${selection}`, tab: tabId, protocol: 2};
     const auth = {key: await PilotPatchConnection.key(pair.token)};
     const hello = await post(pair, auth, "/hello", {});
@@ -78,10 +84,10 @@ async function pump() {
     auth.encryptionKey = await PilotPatchConnection.encryptionKey(auth.key, auth.session);
     const selected = async () => {
       const [current, authority] = await Promise.all([
-        chrome.storage.session.get(["tabId", "selection"]),
+        chrome.storage.session.get(["tabId", "selection", "selectedClient"]),
         chrome.storage.local.get(["pair", "client"])
       ]);
-      if (current.tabId !== tabId || current.selection !== selection
+      if (current.tabId !== tabId || current.selection !== selection || current.selectedClient !== client
           || authority.client !== client || authority.pair?.token !== pair.token
           || authority.pair?.port !== pair.port || authority.pair?.extension_id !== pair.extension_id
           || authority.pair?.version !== pair.version) {
@@ -91,7 +97,11 @@ async function pump() {
     for (;;) {
       await selected();
       const command = await post(pair, auth, "/next", identity);
-      await chrome.action.setBadgeText({text: "ON"});
+      if (!connected) {
+        await chrome.action.setBadgeText({text: "ON"});
+        await chrome.storage.session.set({connectedSelection: selection});
+        connected = true;
+      }
       if (!command.id) {
         await new Promise(resolve => setTimeout(resolve, 750));
         continue;
@@ -105,7 +115,7 @@ async function pump() {
         })};
       } catch (error) {
         const codes = new Set(["composer_has_draft", "send_control_not_unique", "send_disabled",
-          "turn_lost", "not_ready", "selected_tab_left_copilot"]);
+          "turn_lost", "not_ready", "selected_tab_left_copilot", "selected_tab_closed"]);
         result = {error: codes.has(error.message) ? error.message : "selected_tab_action_failed"};
       }
       // A failed result delivery is never retried, especially after submit.
@@ -113,8 +123,14 @@ async function pump() {
       await post(pair, auth, "/result", {...identity, id: command.id, ...result});
     }
   } catch {
-    await chrome.action.setBadgeText({text: ""});
+    // A listener only exists during a local PilotPatch command.
   } finally {
+    if (connected) {
+      await Promise.allSettled([
+        chrome.action.setBadgeText({text: ""}),
+        chrome.storage.session.remove("connectedSelection")
+      ]);
+    }
     running = false;
     if (wakeRequested) { wakeRequested = false; void pump(); }
   }
@@ -135,22 +151,38 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
   // A content script or website must never reconfigure pairing or select a tab.
   if (sender.id !== chrome.runtime.id || sender.tab
       || sender.url !== chrome.runtime.getURL("popup.html")) return false;
-  if (message?.type === "wake") {
-    wakeRequested = running;
-    void pump();
-    reply({ok: true});
-  }
-  return false;
+  popupAction = popupAction.then(async () => {
+    await ready;
+    if (message?.type === "pair") {
+      const pair = PilotPatchConnection.validatePair(message.pair, chrome.runtime.id);
+      await chrome.storage.session.clear();
+      await chrome.storage.local.set({pair, client: crypto.randomUUID()});
+    } else if (message?.type === "select") {
+      const {pair, client} = await chrome.storage.local.get(["pair", "client"]);
+      if (!pair) throw new Error("Choose your pairing file first.");
+      const tab = await chrome.tabs.get(message.tabId).catch(() => null);
+      if (!tab || !PilotPatchConnection.isCopilot(tab.url)) {
+        throw new Error("That tab is no longer on Copilot. Choose an open Copilot tab.");
+      }
+      const selectedClient = client || crypto.randomUUID();
+      if (!client) await chrome.storage.local.set({client: selectedClient});
+      const previous = await chrome.storage.session.get(["tabId", "selectedClient"]);
+      if (previous.tabId !== tab.id || previous.selectedClient !== selectedClient) {
+        await chrome.storage.session.set({tabId: tab.id, selectedClient, selection: crypto.randomUUID()});
+      }
+      wakeRequested = running;
+      void pump();
+    } else if (message?.type === "disconnect") {
+      await chrome.storage.session.clear();
+      await chrome.storage.local.remove(["pair", "client", "tabId"]);
+    } else {
+      throw new Error("Unknown PilotPatch action.");
+    }
+  }).then(() => reply({ok: true}), error => reply({error: error.message}));
+  return true;
 });
 chrome.storage.onChanged.addListener((changes, area) => {
-  const pairChanged = changes.pair?.oldValue
-    && JSON.stringify(changes.pair.oldValue) !== JSON.stringify(changes.pair.newValue);
-  const clientChanged = changes.client?.oldValue && changes.client.oldValue !== changes.client.newValue;
-  if (area === "local" && (pairChanged || clientChanged)) {
-    // Replacing/removing authority revokes the existing selection. Initial pairing
-    // has no previous authority and still requires the user to select a tab.
-    void chrome.storage.session.clear();
-  }
-  if (area === "session") { wakeRequested = running; void pump(); }
+  if (area === "session" && changes.selection) { wakeRequested = running; void pump(); }
 });
+void chrome.action.setBadgeText({text: ""});
 void pump();

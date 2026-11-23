@@ -37,6 +37,32 @@ def test_help_version_and_history_without_browser(tmp_path):
         assert result.returncode == 0, result.stderr + result.stdout
 
 
+def test_editor_registration_and_literal_prompt(tmp_path):
+    project = tmp_path / "project"
+    home = tmp_path / "private"
+    project.mkdir()
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pilotpatch",
+            "--home",
+            str(home),
+            "--project",
+            str(project),
+            "register-editor",
+        ],
+        capture_output=True,
+        encoding="utf-8",
+        timeout=15,
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert json.loads((home / "editor-backend.json").read_text()) == {"python": sys.executable}
+    args = parser().parse_intermixed_args(["run", "--", "--share-code"])
+    assert args.arguments == ["--share-code"]
+    assert not args.share_code
+
+
 async def test_login_reports_sign_in_separately_from_chat_service_error(tmp_path, monkeypatch):
     from types import SimpleNamespace
     from unittest.mock import AsyncMock

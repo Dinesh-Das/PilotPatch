@@ -75,7 +75,7 @@ class AgentLoop:
                 state["messages"].append(dict(role="user", content=prompt))
                 self.store.save(state)
                 self.event(f"[{state['steps']}] Sending context to Microsoft Copilot")
-                self.store.audit(state, "prompt_submitted", step=state["steps"])
+                self.store.audit(state, "prompt_attempted", step=state["steps"])
                 response = await self.provider.send(prompt)
                 state["conversation_url"] = getattr(self.provider, "conversation_url", None)
                 try:

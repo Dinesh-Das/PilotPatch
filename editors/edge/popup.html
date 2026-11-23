@@ -1,19 +1,25 @@
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PilotPatch connection</title><link rel="stylesheet" href="popup.css"></head>
+<title>PilotPatch</title><link rel="stylesheet" href="popup.css"></head>
 <body>
-  <header><span class="mark" aria-hidden="true">P↗</span><div><small>YOUR CURRENT EDGE PROFILE</small><h1>PilotPatch</h1></div></header>
-  <p>Use the Copilot tab you already signed into. This connection leaves your browser open.</p>
-  <label for="pair">1. Pair this profile</label>
-  <input id="pair" type="file" accept=".json,application/json" aria-describedby="pair-help">
-  <p id="pair-help" class="hint">Choose <code>edge-pairing.json</code> from the location shown by <code>pilotpatch connect</code>. The file stays on this computer.</p>
-  <p id="paired" role="status"></p>
-  <label for="tabs">2. Choose an existing Copilot tab</label>
-  <select id="tabs"><option value="">Loading tabs…</option></select>
-  <div class="actions"><button id="refresh" type="button">Refresh list</button><button id="connect" type="button">Connect this tab</button></div>
-  <p id="status" role="status" aria-live="polite"></p>
-  <p class="hint">Then run Sign in or Test connection in the PilotPatch VS Code panel. “ON” means the local agent is connected; Test connection verifies a Copilot reply.</p>
-  <button id="disconnect" type="button" class="quiet">Disconnect this profile</button>
+  <header><h1>PilotPatch</h1><p>Connect this Edge profile to VS Code.</p></header>
+  <p id="status" role="status">Checking Edge…</p>
+  <section id="pair-step" hidden>
+    <label for="pair">Choose pairing file</label>
+    <input id="pair" type="file" accept=".json,application/json" aria-describedby="pair-help">
+    <p id="pair-help">Copy the pairing file path from <strong>Set up Copilot</strong> in VS Code, then paste it into the file picker.</p>
+  </section>
+  <section id="tab-step" hidden>
+    <p id="tab-help"></p>
+    <div id="choose" hidden>
+      <label for="tabs">Copilot tab</label>
+      <select id="tabs"></select>
+    </div>
+    <a id="open" class="primary" href="https://copilot.com/chat" target="_blank" rel="noopener" hidden>Open Copilot</a>
+    <button id="connect" class="primary" type="button" hidden>Use this tab</button>
+  </section>
+  <p id="error" role="alert"></p>
+  <button id="disconnect" type="button" hidden>Disconnect this profile</button>
   <script src="connection.js"></script><script src="popup.js"></script>
 </body></html>

@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling>=1.27,<2"]
+requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [project]
 name = "pilotpatch"
-version = "0.2.2"
+version = "0.2.3"
 description = "A local, Microsoft Copilot-only coding harness for Windows"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
@@ -27,11 +27,26 @@ Repository = "https://github.com/Dinesh-Das/PilotPatch"
 Documentation = "https://github.com/Dinesh-Das/PilotPatch/blob/main/setup.md"
 Issues = "https://github.com/Dinesh-Das/PilotPatch/issues"
 
+[tool.hatch.build.targets.sdist]
+include = [
+  "/pilotpatch/**/*.py", "/editors/edge", "/editors/vscode", "/tests", "/docs", "/examples",
+  "/scripts/build.py", "/build.cmd", "/setup-windows.ps1", "/copilot.cmd", "/copilot-agent.cmd",
+  "/setup.md", "/requirements.txt", "/config.example.yaml", "/AGENTS.md", "/CHANGELOG.md",
+  "/CONTRIBUTING.md",
+]
+exclude = ["/editors/**/node_modules", "**/edge-pairing.json", "**/editor-backend.json"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["pilotpatch"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"editors/edge" = "pilotpatch/edge_extension"
+"editors/edge/background.js" = "pilotpatch/edge_extension/background.js"
+"editors/edge/connection.js" = "pilotpatch/edge_extension/connection.js"
+"editors/edge/content.js" = "pilotpatch/edge_extension/content.js"
+"editors/edge/manifest.json" = "pilotpatch/edge_extension/manifest.json"
+"editors/edge/popup.css" = "pilotpatch/edge_extension/popup.css"
+"editors/edge/popup.html" = "pilotpatch/edge_extension/popup.html"
+"editors/edge/popup.js" = "pilotpatch/edge_extension/popup.js"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -1,6 +1,7 @@
 'use strict';
 const path = require('node:path');
-const actions = new Set(['ready', 'configure', 'workspace', 'stop', 'connect', 'login', 'probe', 'doctor', 'history']);
+const actions = new Set(['ready', 'configure', 'workspace', 'open-folder', 'stop',
+  'connect', 'login', 'probe', 'doctor', 'history', 'copy-extension', 'copy-pairing']);
 const modes = new Set(['approve', 'read-only', 'auto-edit']);
 
 function parseRequest(input) {
@@ -28,7 +29,7 @@ function buildInvocation(executable, project, request) {
   if (request.type === 'run') {
     args.push('--mode', request.mode);
     if (request.dryRun) args.push('--dry-run');
-    args.push('run', request.prompt);
+    args.push('run', '--', request.prompt);
   } else if (['connect', 'login', 'probe', 'doctor', 'history'].includes(request.type)) {
     args.push(request.type);
   } else throw new Error('This action does not launch a backend process.');

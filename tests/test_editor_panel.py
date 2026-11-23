@@ -80,10 +80,11 @@ async def publish(page, **overrides):
 @pytest.mark.browser
 async def test_panel_empty_setup_then_keyboard_submission(editor_panel):
     page, _ = editor_panel
-    assert await page.get_by_role("button", name="Run task").is_disabled()
+    assert not await page.get_by_role("button", name="Run task").is_visible()
     await publish(page)
     task = 'Fix "login"; $(whoami) & echo x\nAdd tests.'
     await page.get_by_label("What would you like to change?").fill(task)
+    await page.get_by_text("Task options", exact=True).click()
     await page.get_by_label("Permissions").select_option("read-only")
     await page.get_by_label("Preview only").check()
     await page.get_by_label("What would you like to change?").press("Control+Enter")
@@ -96,7 +97,7 @@ async def test_panel_empty_setup_then_keyboard_submission(editor_panel):
 async def test_panel_safe_text_running_stop_and_error_states(editor_panel):
     page, _ = editor_panel
     await publish(page)
-    await page.get_by_role("button", name="Connect existing Edge").click()
+    await page.get_by_role("button", name="Set up Copilot").click()
     assert await page.evaluate("window.panelMessages.at(-1)") == {"type": "connect"}
     await publish(page, workspace='<img src=x onerror="alert(1)">')
     assert await page.locator("#workspace-name").inner_text() == '<img src=x onerror="alert(1)">'
@@ -107,6 +108,21 @@ async def test_panel_safe_text_running_stop_and_error_states(editor_panel):
     assert await page.evaluate("window.panelMessages.at(-1)") == {"type": "stop"}
     await publish(page, phase="error", message="Backend Python was not found.")
     assert "Backend Python" in await page.get_by_role("status").inner_text()
+
+
+@pytest.mark.browser
+async def test_panel_guides_first_setup_and_hides_steps_after_verified_reply(editor_panel):
+    page, _ = editor_panel
+    await publish(page, project="", workspace="", configured=False)
+    assert await page.get_by_role("button", name="Open folder").is_visible()
+    await publish(page, configured=False)
+    assert await page.get_by_role("button", name="Select installed Python").is_visible()
+    await publish(page, prepared=True)
+    await page.get_by_role("button", name="Copy pairing file path").click()
+    assert await page.evaluate("window.panelMessages.at(-1)") == {"type": "copy-pairing"}
+    assert await page.get_by_role("button", name="Test connection").is_visible()
+    await publish(page, prepared=True, verified=True)
+    assert not await page.get_by_role("button", name="Copy pairing file path").is_visible()
 
 
 @pytest.mark.browser

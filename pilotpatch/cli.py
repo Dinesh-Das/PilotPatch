@@ -20,7 +20,7 @@ from pilotpatch.config import Config, default_home, load_config
 from pilotpatch.providers.factory import browser_provider
 from pilotpatch.security.permissions import Permissions
 from pilotpatch.security.redaction import redact
-from pilotpatch.security.storage import atomic_bytes, private_directory
+from pilotpatch.security.storage import atomic_bytes, atomic_json, private_directory
 from pilotpatch.tools.command_runner import CommandRunner
 from pilotpatch.tools.filesystem import FileTools
 from pilotpatch.tools.registry import ToolRegistry
@@ -39,6 +39,7 @@ COMMANDS = {
     "config",
     "doctor",
     "connect",
+    "register-editor",
 }
 
 
@@ -115,6 +116,11 @@ async def _task(args, config, store, state, *, resume=False):
             await provider.open()
             status = await provider.status()
             ui.event(f"Microsoft session: {status}")
+            if not status["chat_ready"]:
+                raise RuntimeError(
+                    "Copilot chat is not ready. In Edge, open the selected chat and check your "
+                    "Microsoft sign-in. Run Test connection before retrying."
+                )
             files = FileTools(
                 repo, session_dir, permissions, dry_run=state["dry_run"], preview=ui.preview
             )
@@ -290,6 +296,7 @@ async def _doctor(args, config):
             results["edge_initialization"] = True
             status = await session.status()
             results["chat_ready"] = status["chat_ready"]
+            results["copilot_state"] = status.get("state")
             results["live_reply_verified"] = False
         except Exception as exc:
             results["browser_error"] = redact(str(exc))
@@ -309,8 +316,11 @@ async def _doctor(args, config):
 
 
 def _connect(home: Path):
-    with FileLock(home / "browser.lock", timeout=0):
-        _prepare_connection(home)
+    try:
+        with FileLock(home / "browser.lock", timeout=0):
+            _prepare_connection(home)
+    except Timeout as exc:
+        raise RuntimeError("Stop the active PilotPatch task before preparing Edge setup.") from exc
 
 
 def _prepare_connection(home: Path):
@@ -337,9 +347,10 @@ def _prepare_connection(home: Path):
         f"   Select folder: {destination}\n"
         "2. Open the PilotPatch extension and choose this local pairing file:\n"
         f"   {home / 'edge-pairing.json'}\n"
-        "3. Select your already-open Copilot tab and click Connect this tab.\n"
-        "4. Run login, then probe (Test connection in VS Code).\n"
-        "No browser/profile was opened. Keep the pairing file private.\n"
+        "3. Open Copilot in this Edge profile and sign in. In the extension, click Use this tab.\n"
+        "   Choose the intended tab if several are open.\n"
+        "4. Run probe (Test connection in VS Code) and keep the tab open.\n"
+        "Keep the pairing file private.\n"
         "When updating an installed extension, click Reload on edge://extensions."
     )
 
@@ -358,6 +369,10 @@ async def dispatch(args) -> int:
             "--home must be outside the project to isolate browser credentials and backups"
         )
     private_directory(args.home)
+    if command == "register-editor":
+        atomic_json(args.home / "editor-backend.json", {"python": str(Path(sys.executable))})
+        ui.event("Registered this backend for the PilotPatch editor extension.")
+        return 0
     config = load_config(args.config_path or args.home / "config.yaml")
     overrides = config.model_dump()
     if args.browser_connection:

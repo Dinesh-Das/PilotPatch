@@ -8,7 +8,7 @@ test('preserves task text as a single process argument without shell interpretat
   const request = parseRequest({type: 'run', prompt, mode: 'approve', dryRun: false});
   const invocation = buildInvocation('C:\\Python path\\python.exe', 'C:\\My project', request);
   assert.equal(invocation.executable, 'C:\\Python path\\python.exe');
-  assert.deepEqual(invocation.args.slice(-2), ['run', prompt]);
+  assert.deepEqual(invocation.args.slice(-3), ['run', '--', prompt]);
   assert.equal(invocation.cwd, 'C:\\My project');
   assert.ok(!invocation.args.includes('--share-code'));
 });

@@ -1,17 +1,18 @@
-:root { color-scheme: dark light; font: 14px/1.5 system-ui, sans-serif; }
-body { width: 360px; margin: 0; padding: 24px; background: #101a22; color: #e8eef2; }
-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
-.mark { font-size: 32px; color: #71d3c1; border-left: 3px solid; padding-left: 10px; }
-small { font-size: 10px; letter-spacing: 1.5px; color: #a4bac6; }
-h1 { font-size: 24px; margin: 0; }
-p { margin: 12px 0 20px; }
-label { display: block; font-weight: 650; margin: 20px 0 8px; }
+:root { color-scheme: dark; font: 14px/1.5 system-ui, sans-serif; }
+* { box-sizing: border-box; }
+[hidden], #error:empty { display: none !important; }
+body { width: 340px; margin: 0; padding: 20px; background: #101a22; color: #e8eef2; }
+header { padding-bottom: 12px; border-bottom: 1px solid #3a525e; }
+h1 { margin: 0; font-size: 23px; }
+p { margin: 8px 0; overflow-wrap: anywhere; }
+header p, #pair-help, #tab-help { color: #bdd0d9; }
+#status { margin: 16px 0 8px; color: #8ce3d3; font-weight: 650; }
+label { display: block; font-weight: 650; margin: 12px 0 6px; }
 input, select, button { font: inherit; max-width: 100%; }
-select { width: 100%; padding: 10px; background: #1d2c37; color: inherit; border: 1px solid #728a99; border-radius: 6px; }
-.hint { font-size: 12px; color: #b5c7d2; }
-.actions { display: flex; gap: 8px; margin-top: 12px; }
-button { padding: 9px 12px; border: 1px solid #728a99; border-radius: 6px; background: #1d2c37; color: inherit; cursor: pointer; }
-#connect { background: #71d3c1; color: #102329; border-color: #71d3c1; font-weight: 650; }
-:focus-visible { outline: 3px solid #f0cd78; outline-offset: 3px; }
-.quiet { font-size: 12px; }
-#status, #paired { overflow-wrap: anywhere; }
+select { width: 100%; padding: 8px; background: #1d2c37; color: inherit; border: 1px solid #728a99; border-radius: 4px; }
+button, .primary { padding: 8px 12px; border: 1px solid #728a99; border-radius: 4px; background: #1d2c37; color: inherit; cursor: pointer; }
+.primary { display: block; width: 100%; margin-top: 12px; background: #81decb; color: #102329; border-color: #81decb; font-weight: 650; text-align: center; text-decoration: none; }
+button:disabled { opacity: .55; cursor: default; }
+:focus-visible { outline: 2px solid #f0cd78; outline-offset: 3px; }
+#disconnect { margin-top: 16px; font-size: 12px; }
+#error { color: #ffc0b5; }

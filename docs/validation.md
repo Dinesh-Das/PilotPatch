@@ -1,4 +1,15 @@
-# Validation report — 8 November 2026
+# Validation report
+
+## Setup and packaging audit (0.2.3)
+
+**149 Python tests passed, 5 skipped.** Fourteen JavaScript checks, Ruff lint and
+Ruff formatting passed. Live Microsoft account tests were skipped.
+
+A clean Git snapshot produced all five package types with one command. A fresh
+installation from the office bundle passed PowerShell 5.1, dependency checks,
+offline diagnostics and a real VS Code extension-host setup task on Windows x64
+with Python 3.12. Local Chromium exercised the shipped Edge popup and broker.
+See the [audit report](audit-2026-11-24.md) for findings and scope.
 
 ## Office-laptop repeat audit (0.2.2)
 

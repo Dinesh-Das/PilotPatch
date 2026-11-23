@@ -1,6 +1,9 @@
 'use strict';
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
 const {Controller} = require('../src/controller');
 
 function fixture(overrides = {}) {
@@ -32,7 +35,7 @@ function fixture(overrides = {}) {
       },
     },
   };
-  const controller = new Controller(api, state => updates.push(state));
+  const controller = new Controller(api, state => updates.push(state), overrides.home || '');
   return {controller, api, updates, tasks, listeners, terminated: () => terminated};
 }
 const run = {type: 'run', prompt: 'Implement a health check', mode: 'approve', dryRun: false};
@@ -90,4 +93,24 @@ test('stopping terminates only the owned task and waits for its end event', asyn
   f.listeners.end({execution: f.tasks[0], exitCode: undefined});
   assert.equal(f.updates.at(-1).phase, 'stopped');
   assert.equal(f.updates.at(-1).busy, false);
+});
+
+test('uses the registered backend and copies only paths for successful setup', async t => {
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'pilotpatch-editor-'));
+  t.after(() => fs.rm(home, {recursive: true, force: true}));
+  await fs.writeFile(path.join(home, 'editor-backend.json'), JSON.stringify({python: process.execPath}));
+  const f = fixture({missingPython: true, home});
+  let clipboard;
+  f.api.env.clipboard = {async writeText(value) {clipboard = value;}};
+  await f.controller.handle({type: 'copy-pairing'});
+  assert.equal(clipboard, undefined);
+  await f.controller.handle({type: 'connect'});
+  f.listeners.end({execution: f.tasks[0], exitCode: 0});
+  assert.equal(f.updates.at(-1).prepared, true);
+  assert.equal(f.updates.at(-1).verified, false);
+  await f.controller.handle({type: 'copy-pairing'});
+  assert.equal(clipboard, path.join(home, 'edge-pairing.json'));
+  await f.controller.handle({type: 'probe'});
+  f.listeners.end({execution: f.tasks[1], exitCode: 0});
+  assert.equal(f.updates.at(-1).verified, true);
 });

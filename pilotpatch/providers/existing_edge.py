@@ -27,9 +27,9 @@ class CopilotExistingEdge:
         except TimeoutError as exc:
             await self.close()
             raise ProviderError(
-                "No existing Edge tab connected. In your current Edge profile, open the "
-                "PilotPatch extension, choose your Copilot tab and click Connect. "
-                "Run 'pilotpatch connect' for setup. No new profile was opened."
+                "Edge did not connect. Open PilotPatch in the Edge profile you intend to use "
+                "and click Use this tab or Reconnect. If the extension is missing or disabled, "
+                "check edge://extensions. Managed Edge can block unpacked extensions."
             ) from exc
         except BaseException:
             await self.close()
@@ -81,9 +81,16 @@ class CopilotExistingEdge:
         if status["state"] == "service_error":
             raise ProviderError("Copilot shows a service error. No prompt was submitted.")
         if not status["authenticated"] or not status["chat_ready"]:
+            steps = {
+                "manual_authentication_required": "Finish signing in and return to Copilot.",
+                "sign_in_required": "Sign in to Copilot in the selected Edge tab.",
+                "account_control_not_recognized": "Open the Copilot account menu in this tab.",
+                "waiting_for_copilot_chat": "Open a Copilot chat in the selected tab and wait "
+                "for the message box.",
+            }
             raise AuthenticationRequired(
-                "Selected Copilot tab is not ready. Run login/status and check its account menu. "
-                "No prompt was submitted."
+                steps.get(status["state"], "Check the Copilot message box in the selected tab.")
+                + " No prompt was submitted."
             )
         nonce = secrets.token_hex(12)
         payload = dict(

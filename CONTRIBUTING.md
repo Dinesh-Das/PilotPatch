@@ -23,13 +23,15 @@ From the repository root in PowerShell, after completing development setup:
 .\.venv\Scripts\python.exe -m ruff check .
 .\.venv\Scripts\python.exe -m ruff format --check .
 node --test tests/edge_connection.test.cjs
-npm --prefix editors/vscode test
-.\.venv\Scripts\python.exe -m build
+node --test editors/vscode/test/*.test.js
+.\build.cmd
 ```
 
 The full Python suite requires installed Edge, Node.js and the isolated Chromium
 test browser described in setup.md. Account-bound tests remain explicitly gated;
 report them separately from offline/local-fixture results.
+The build produces packages in `artifacts/`. Pass `--no-office` to skip gathering
+Windows runtime wheels or `--wheelhouse PATH` to use an approved local index.
 
 Describe the problem, resulting behavior, checks performed and any remaining
 validation limits when submitting changes. Use the issue tracker for reproducible

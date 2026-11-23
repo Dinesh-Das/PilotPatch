@@ -16,44 +16,63 @@ function renderPanel(webview, extensionUri, Uri) {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${source}; script-src 'nonce-${nonce}'; img-src ${source}; connect-src 'none'; base-uri 'none'; form-action 'none';">
 <link rel="stylesheet" href="${resource('panel.css')}"><title>PilotPatch</title></head>
 <body>
-<header class="masthead"><span class="brand-mark" aria-hidden="true">P<span>↗</span></span>
-<div><p class="eyebrow">YOUR PROJECT, IN FLIGHT</p><h1>PilotPatch</h1></div></header>
+<header class="masthead"><h1>PilotPatch</h1><p>Microsoft Copilot Web</p></header>
 <main>
   <section class="workspace-section" aria-label="Target project">
-    <div class="section-label">WORKSPACE <button id="workspace" class="text-button">Change</button></div>
-    <strong id="workspace-name">No project open</strong>
-    <p id="workspace-path" class="path">Open a local folder to get started.</p>
+    <strong id="workspace-name">Checking workspace…</strong>
+    <p id="workspace-path" class="path"></p>
+    <button id="workspace" class="text-button" hidden>Change project</button>
   </section>
-  <section id="setup" class="setup" aria-labelledby="setup-title" hidden>
-    <h2 id="setup-title">Connect your local harness</h2>
-    <p>Select the Python executable from your PilotPatch virtual environment. You only need to do this once per editor.</p>
-    <button id="configure" class="secondary">Select backend Python</button>
+  <section id="project-setup" class="setup" hidden>
+    <p>Open the local folder you want PilotPatch to work in.</p>
+    <button id="open-folder" class="primary">Open folder</button>
   </section>
-  <form id="task-form">
-    <div class="composer-heading"><h2>A prompt. A patch.</h2><span class="provider">MICROSOFT COPILOT</span></div>
+  <section id="backend-setup" class="setup" hidden>
+    <h2>Install the PilotPatch backend</h2>
+    <p>Run <code>setup-windows.ps1</code> from your PilotPatch folder. If you installed it manually, select the Python executable in its <code>.venv</code> folder.</p>
+    <button id="configure" class="secondary">Select installed Python</button>
+  </section>
+  <section id="connection" class="setup" aria-labelledby="setup-title" hidden>
+    <h2 id="setup-title">Connect Copilot in Edge</h2>
+    <p id="connect-intro">Set up your Edge profile once. If you already paired it, run the connection test.</p>
+    <button id="connect" class="primary">Set up Copilot</button>
+    <ol class="setup-steps" id="edge-steps" hidden>
+      <li>In the Edge profile you want to use, open <code>edge://extensions</code>. Turn on <strong>Developer mode</strong> and choose <strong>Load unpacked</strong>. Paste the folder path. For an existing PilotPatch install, click <strong>Reload</strong> on its card instead.
+        <button id="copy-extension" class="secondary">Copy extension folder path</button></li>
+      <li>Open <strong>PilotPatch</strong> from Edge’s Extensions menu. If it asks for a pairing file, paste the file path in the picker. Open Copilot, sign in, and click <strong>Use this tab</strong> in PilotPatch.
+        <button id="copy-pairing" class="secondary">Copy pairing file path</button></li>
+    </ol>
+    <button id="probe" class="secondary">Test connection</button>
+    <p class="subtle">The test sends a short message with no project files. Managed Edge may block loading the extension.</p>
+  </section>
+  <section class="execution" aria-label="Execution status">
+    <p id="status" role="status" aria-live="polite"></p>
+    <p id="panel-error" role="alert" hidden></p>
+    <button id="stop" type="button" class="secondary" hidden>Stop task</button>
+  </section>
+  <form id="task-form" hidden>
     <label for="prompt">What would you like to change?</label>
     <textarea id="prompt" rows="8" maxlength="16000" spellcheck="false" placeholder="Add a health-check endpoint and cover it with tests." aria-describedby="prompt-help"></textarea>
     <div class="composer-footer"><span id="prompt-help">Ctrl / ⌘ + Enter to run</span><span id="counter">0 / 16,000</span></div>
-    <div class="options">
+    <details class="task-options"><summary>Task options</summary><div class="options">
       <div class="mode"><label for="mode">Permissions</label><select id="mode">
         <option value="approve">Approve changes</option><option value="read-only">Read only</option>
         <option value="auto-edit">Auto-edit files</option></select></div>
       <label class="checkbox"><input id="dry-run" type="checkbox"> Preview only</label>
     </div>
-    <p id="mode-note" class="subtle">Review edits and approve commands in the terminal.</p>
-    <div class="submit-row"><button id="run" type="submit" class="primary">Run task <span aria-hidden="true">↗</span></button>
-      <button id="stop" type="button" class="secondary" hidden>Stop task</button></div>
+    <p id="mode-note" class="subtle">Review edits and approve commands in the terminal.</p></details>
+    <button id="run" type="submit" class="primary">Run task</button>
+    <p class="subtle">Review source sharing, edits and command approvals in the terminal.</p>
   </form>
-  <section class="execution" aria-label="Execution status"><p class="status-label" id="phase">READY</p>
-    <p id="status" role="status" aria-live="polite">Ready when you are.</p>
-    <p id="panel-error" role="alert" hidden></p></section>
   <section id="activity-section" class="activity" hidden><h2>Recent activity</h2><ol id="activity"></ol></section>
 </main>
-<footer><div class="tools" aria-label="Copilot setup and diagnostics">
-  <button id="connect" class="text-button">Connect existing Edge</button>
-  <button id="login" class="text-button">Sign in</button><button id="probe" class="text-button">Test connection</button>
-  <button id="doctor" class="text-button">Check setup</button><button id="settings" class="text-button">Backend</button>
-</div><p class="privacy">Routes to Microsoft Copilot Web.<br>Source-sharing consent and approvals happen in your terminal.</p></footer>
+<footer id="tools" hidden><details><summary>Troubleshooting</summary><div class="tools">
+  <button id="repair" class="text-button">Set up or repair Edge</button>
+  <button id="retest" class="text-button" hidden>Test Copilot connection</button>
+  <button id="login" class="text-button">Check Microsoft sign-in</button>
+  <button id="doctor" class="text-button">Check this laptop</button>
+  <button id="settings" class="text-button">Change backend Python</button>
+</div></details></footer>
 <script nonce="${nonce}" src="${resource('panel.js')}"></script></body></html>`;
 }
 

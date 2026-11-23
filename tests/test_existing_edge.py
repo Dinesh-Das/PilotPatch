@@ -1,6 +1,8 @@
 """Real MV3 extension + local broker + public DOM fixtures. No Microsoft traffic/account."""
 
 import asyncio
+import itertools
+import json
 from pathlib import Path
 
 import pytest
@@ -73,7 +75,9 @@ async def connected_edge(tmp_path):
                 await chrome.storage.local.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'});
                 const tabs = await chrome.tabs.query({url:'https://copilot.com/*'});
                 await chrome.storage.local.set({pair,client:'fixture-client'});
-                await chrome.storage.session.set({tabId:tabs[0].id,selection:'fixture-selection'});
+                await chrome.storage.session.set({
+                  tabId:tabs[0].id,selection:'fixture-selection',selectedClient:'fixture-client'
+                });
                 void pump();
             }""",
                 dict(pair, port=provider.bridge.port),
@@ -96,6 +100,76 @@ async def test_existing_tab_round_trip_and_multiple_turns(connected_edge):
     assert await provider.send("First fixture request") == "Complete fixture answer"
     assert await provider.send("Second fixture request") == "Complete fixture answer"
     assert await page.evaluate("window.sentCount") == 2
+
+
+@pytest.mark.browser
+async def test_toolbar_popup_pairs_and_never_switches_tabs_on_its_own(connected_edge, tmp_path):
+    provider, page, worker = connected_edge
+    file = tmp_path / "popup-pairing.json"
+    file.write_text(
+        json.dumps(dict(pairing(provider.home), port=provider.bridge.port)), encoding="utf-8"
+    )
+    other = await page.context.new_page()
+    await other.goto("https://copilot.com/chat?other")
+    await page.bring_to_front()
+    await worker.evaluate("chrome.action.openPopup()")
+    cdp = await page.context.new_cdp_session(page)
+    targets = (await cdp.send("Target.getTargets"))["targetInfos"]
+    popup = next(item for item in targets if item["url"].endswith("/popup.html"))
+    session = (await cdp.send("Target.attachToTarget", {"targetId": popup["targetId"]}))[
+        "sessionId"
+    ]
+    request_ids = itertools.count(1)
+
+    async def call(method, **params):
+        response = asyncio.get_running_loop().create_future()
+        identifier = next(request_ids)
+
+        def received(event):
+            data = json.loads(event["message"])
+            if event["sessionId"] == session and data.get("id") == identifier:
+                response.set_result(data)
+
+        cdp.on("Target.receivedMessageFromTarget", received)
+        try:
+            message = json.dumps({"id": identifier, "method": method, "params": params})
+            await cdp.send("Target.sendMessageToTarget", {"sessionId": session, "message": message})
+            return (await asyncio.wait_for(response, 5))["result"]
+        finally:
+            cdp.remove_listener("Target.receivedMessageFromTarget", received)
+
+    async def evaluate(expression):
+        result = await call("Runtime.evaluate", expression=expression, returnByValue=True)
+        return result["result"].get("value")
+
+    async def wait_for(expression):
+        for _ in range(100):
+            if await evaluate(expression):
+                return
+            await asyncio.sleep(0.05)
+        pytest.fail(f"Popup state did not match: {expression}")
+
+    try:
+        await wait_for("!document.querySelector('#disconnect').hidden")
+        await evaluate("document.querySelector('#disconnect').click()")
+        await wait_for("!document.querySelector('#pair-step').hidden")
+        document = await call("DOM.getDocument")
+        node = await call("DOM.querySelector", nodeId=document["root"]["nodeId"], selector="#pair")
+        await call("DOM.setFileInputFiles", nodeId=node["nodeId"], files=[str(file)])
+        await wait_for("!document.querySelector('#tab-step').hidden")
+        assert await evaluate("!document.querySelector('#choose').hidden")
+        assert await evaluate("document.querySelector('#connect').disabled")
+        await other.close()
+        await wait_for("document.querySelector('#choose').hidden")
+        assert await evaluate("!document.querySelector('#connect').disabled")
+        selected = "async () => (await chrome.storage.session.get('tabId')).tabId"
+        assert not await worker.evaluate(selected)
+        await evaluate("document.querySelector('#connect').click()")
+        await wait_for("document.querySelector('#status').textContent === 'Tab selected'")
+        chosen = await worker.evaluate(selected)
+        assert isinstance(chosen, int)
+    finally:
+        await cdp.send("Target.detachFromTarget", {"sessionId": session})
 
 
 @pytest.mark.browser
