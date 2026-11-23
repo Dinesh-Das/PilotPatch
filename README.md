@@ -12,14 +12,15 @@ From the PilotPatch folder in PowerShell:
 .\setup-windows.ps1 -InstallEditor
 ```
 
-1. Open your project folder in VS Code. Click **PilotPatch** in the activity bar.
-2. Click **Set up Copilot** and follow the two Edge steps in the panel. In Edge, open
-   Copilot, sign in, and click **Use this tab** in the PilotPatch extension.
-3. Return to VS Code and click **Test connection**. When Copilot replies, enter
-   a task and click **Run task**.
+1. In your Edge profile, go to `edge://extensions`, turn on **Developer mode**, and
+   click **Load unpacked**. Paste the `edge-extension` folder printed by setup.
+2. Open **PilotPatch** from Edge's Extensions menu. Choose the pairing file printed
+   by setup if asked. Open Copilot, sign in, and click **Use this tab** in PilotPatch.
+3. Open your project in VS Code, click **PilotPatch**, then **Test connection**.
+   When Copilot replies, enter a task and click **Run task**.
 
-The setup command installs Python dependencies, registers the backend with the
-editor, and builds the VSIX automatically if it is missing. You need Windows 11 x64,
+The setup command installs Python dependencies, prepares the Edge files, registers the
+backend with the editor, and builds the VSIX if it is missing. You need Windows 11 x64,
 approved 64-bit CPython 3.11–3.13, Git, Edge 120+ and local VS Code. See setup for
 Cursor, CLI-only installation and restricted PowerShell.
 [Full setup guide](setup.md)
@@ -33,6 +34,7 @@ Cursor, CLI-only installation and restricted PowerShell.
 Look in `artifacts` for the Python wheel and source archive, VSIX, Edge ZIP and Windows
 offline bundle. The build uses Python and your approved Python package index. For a
 local index, use `--wheelhouse PATH`. Use `--no-office` to skip the offline bundle.
+For **Load unpacked** in Edge, use the `edge-extension` folder printed by Windows setup.
 [Contributor checks](CONTRIBUTING.md)
 
 ## Account and data destination

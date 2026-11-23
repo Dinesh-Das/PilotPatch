@@ -260,7 +260,7 @@ def main():
             ("Python install wheel", wheel),
             ("Python source archive", sdist),
             ("VS Code extension installer", vsix),
-            ("Edge extension ZIP", edge_zip),
+            ("Edge extension ZIP for distribution", edge_zip),
         ]
         if not options.no_office:
             office = stage / f"PilotPatch-Office-{version}.zip"
@@ -274,6 +274,11 @@ def main():
             target = artifacts / path.name
             path.replace(target)
             print(f"{label} saved to {target}", flush=True)
+        print(
+            r"For Edge's Load unpacked dialog, run .\setup-windows.ps1 and select the "
+            "edge-extension folder it prints. That folder contains manifest.json.",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":

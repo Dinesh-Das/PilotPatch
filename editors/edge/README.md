@@ -4,10 +4,12 @@ PilotPatch connects the local backend to the Copilot tab you authorize in your c
 Edge profile. Browser pairing stays in that profile. Tab selection lasts for the current
 browser session.
 
-1. In VS Code, click **Set up Copilot**. For CLI setup, run `copilot.cmd connect`.
+1. Windows setup prints the extension folder and pairing file. To see the paths again,
+   click **Set up Copilot** in VS Code or run `copilot.cmd connect`.
 2. In the intended Edge profile, open `edge://extensions`, enable **Developer mode** and
-   choose **Load unpacked**. Paste the extension folder path. If the extension is already
-   installed, choose **Reload** on its card.
+   choose **Load unpacked**. Paste the `edge-extension` folder path. That folder
+   contains `manifest.json`. If the extension is already installed from this folder,
+   choose **Reload** on its card.
 3. From Edge's Extensions menu, open **PilotPatch**. Choose the private pairing file
    if asked. Open **Copilot** in that profile and sign in.
 4. Click **Use this tab**. One open Copilot tab is already highlighted. If several

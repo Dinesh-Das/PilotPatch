@@ -341,17 +341,20 @@ def _prepare_connection(home: Path):
         "popup.js",
     ):
         atomic_bytes(destination / name, (source / name).read_bytes())
-    ui.event(
-        "One-time setup in your CURRENT Edge profile:\n"
-        "1. Open edge://extensions, enable Developer mode and choose Load unpacked.\n"
-        f"   Select folder: {destination}\n"
-        "2. Open the PilotPatch extension and choose this local pairing file:\n"
+    ui.console.print(
+        "In the Edge profile you want to use:\n"
+        "1. Go to edge://extensions, enable Developer mode and click Load unpacked.\n"
+        "   Paste this folder path into the picker. It contains manifest.json.\n"
+        f"   {destination}\n"
+        "   If PilotPatch is already installed from this folder, click Reload on its card.\n"
+        "2. Open PilotPatch from Edge's Extensions menu. If asked for a pairing file, use:\n"
         f"   {home / 'edge-pairing.json'}\n"
         "3. Open Copilot in this Edge profile and sign in. In the extension, click Use this tab.\n"
         "   Choose the intended tab if several are open.\n"
         "4. Run probe (Test connection in VS Code) and keep the tab open.\n"
-        "Keep the pairing file private.\n"
-        "When updating an installed extension, click Reload on edge://extensions."
+        "Keep the pairing file private.",
+        markup=False,
+        soft_wrap=True,
     )
 
 

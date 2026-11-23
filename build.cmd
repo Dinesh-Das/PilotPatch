@@ -13,6 +13,8 @@ rem                                         VSIX, source files and Windows depen
 rem   PilotPatch-Office-VERSION.zip.sha256 Checksum for the office bundle
 rem Pass --no-office to skip the office ZIP and its checksum.
 rem Pass --wheelhouse PATH to use a local folder of approved wheels.
+rem For Edge's Load unpacked picker, run .\setup-windows.ps1 and use the
+rem edge-extension folder it prints. That folder contains manifest.json.
 
 if exist "%~dp0.venv\Scripts\python.exe" (
   "%~dp0.venv\Scripts\python.exe" -I -c "import sys; assert (3, 11) <= sys.version_info < (3, 14)" >nul 2>&1

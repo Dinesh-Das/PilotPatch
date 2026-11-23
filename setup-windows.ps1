@@ -15,9 +15,10 @@ With -InstallEditor, setup installs artifacts\pilotpatch-VERSION.vsix into VS Co
 If the VSIX is missing, setup first builds it alongside the Python wheel, Python
 source archive and Edge ZIP in artifacts\. VERSION comes from pyproject.toml.
 
-After setup, choose Set up Copilot in VS Code or run .\copilot.cmd connect.
-That step prepares %LOCALAPPDATA%\PilotPatch\edge-extension\manifest.json and the
-other Edge extension files, plus the private edge-pairing.json in the same PilotPatch directory.
+Setup prepares %LOCALAPPDATA%\PilotPatch\edge-extension\manifest.json and the other
+Edge extension files. In Edge's Load unpacked dialog, select the edge-extension folder
+printed by setup. When the PilotPatch popup asks for a pairing file, use the private
+edge-pairing.json printed by setup.
 
 .PARAMETER Python
 Full path to an approved 64-bit CPython 3.11, 3.12 or 3.13 executable.
@@ -106,6 +107,7 @@ if ($index.Count) {
 }
 Invoke-Checked $venvPython @('-I', '-m', 'pip', 'check')
 Invoke-Checked $venvPython @('-I', '-m', 'pilotpatch', '--project', $projectRoot, 'register-editor')
+Invoke-Checked $venvPython @('-I', '-m', 'pilotpatch', '--project', $projectRoot, 'connect')
 if ($InstallEditor) {
     $editor = Get-Command code.cmd -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $editor) {
@@ -117,7 +119,7 @@ if ($InstallEditor) {
     }
     Invoke-Checked $editor.Source @('--install-extension', $vsix)
     Write-Host "Installed the VS Code extension from $vsix"
-    Write-Host 'Open your project in VS Code, click PilotPatch, then choose Set up Copilot.'
+    Write-Host 'After selecting the tab in Edge, open your project in VS Code and click PilotPatch, then Test connection.'
 }
 $edgeCandidates = @(
     (Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'),
@@ -131,5 +133,5 @@ Write-Host "PilotPatch $version installed into $venvRoot"
 Write-Host "Backend Python is $venvPython"
 if (-not $InstallEditor) {
     Write-Host 'For VS Code, rerun setup with -InstallEditor.'
-    Write-Host "For the command line, run: & '$projectRoot\copilot.cmd' connect"
+    Write-Host "After selecting the tab in Edge, run & '$projectRoot\copilot.cmd' probe"
 }

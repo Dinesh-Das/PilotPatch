@@ -118,10 +118,13 @@ def test_connect_packages_assets_and_logout_preserves_profile(tmp_path, monkeypa
     from pilotpatch.config import Config
 
     messages = []
-    monkeypatch.setattr(cli.ui, "event", messages.append)
+    monkeypatch.setattr(cli.ui.console, "print", lambda message, **_: messages.append(message))
     cli._connect(tmp_path)
     token = pairing(tmp_path)["token"]
     assert (tmp_path / "edge-extension" / "manifest.json").is_file()
+    assert str(tmp_path / "edge-extension") in messages[0]
+    assert "Load unpacked" in messages[0]
+    assert "manifest.json" in messages[0]
     assert not any(token in message for message in messages)
     cli._connect(tmp_path)
     assert pairing(tmp_path)["token"] == token

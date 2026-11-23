@@ -25,9 +25,9 @@ $PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.2.3.vsix'
 .\setup-windows.ps1 -InstallEditor
 ```
 
-This installs and checks the local Python environment, registers it with PilotPatch in
-VS Code, and installs the matching VSIX. If it is missing, the script builds it for
-you. Omit `-InstallEditor` for CLI-only setup. Use `-Python 'C:\Approved Python\python.exe'`
+This installs and checks the local Python environment, prepares the Edge files, and
+registers the backend with PilotPatch in VS Code. With `-InstallEditor`, setup builds
+the matching VSIX if needed and installs it. Use `-Python 'C:\Approved Python\python.exe'`
 if the script cannot find the approved interpreter. Setup reuses a working environment.
 If the environment was copied from another laptop, move it aside and rerun setup.
 
@@ -55,16 +55,17 @@ if needed.
 
 ## 3. Connect your current Edge profile
 
-In VS Code, open your local project and click **PilotPatch → Set up Copilot**.
-For CLI-only setup, run:
+Use the `edge-extension` folder and pairing file printed by Windows setup. With a
+manually installed backend, click **PilotPatch → Set up Copilot** in VS Code or run:
 
 ```powershell
 & $PilotPatchCli --project $TargetProject connect
 ```
 
 1. In the Edge profile you want to use, open `edge://extensions`. Enable **Developer
-   mode** and click **Load unpacked**. Paste or select the extension folder shown.
-   If PilotPatch is already installed, click **Reload** on its card.
+   mode** and click **Load unpacked**. Paste the full path to the `edge-extension`
+   folder. Check that `manifest.json` is directly inside that folder. If PilotPatch
+   is already installed from it, click **Reload** on its card.
 2. Open **PilotPatch** from Edge's Extensions menu and choose the pairing file if
    asked. Open Copilot in that Edge profile and sign in. Click **Use this tab** in
    the PilotPatch popup. Choose the intended tab when more than one is open.
@@ -313,6 +314,7 @@ tab without submitting a model prompt:
 | Python 3.14+ or 32-bit Python is installed | Select approved 64-bit CPython 3.11–3.13 with `-Python`; this lock does not require compiling native dependencies. |
 | Copied `.venv` does not start | Recreate it on this laptop; transfer source/packages, not virtual environments or private state. |
 | `code` or `cursor` is not recognized | Use Install from VSIX in your editor. |
+| Manifest file is missing or unreadable | In **Load unpacked**, choose the `edge-extension` folder printed by Windows setup or copied from the VS Code panel. Edge looks for `manifest.json` directly inside the selected folder. |
 | Existing Edge is not paired | Run `connect`, load the unpacked extension in the current profile, then choose the pairing file and tab. |
 | No existing Edge tab connected | Keep Edge open. Check that the extension is enabled in that profile, choose the tab, click Reconnect while the CLI waits. |
 | Another PilotPatch browser task is active | Finish it or stop that specific task with Ctrl+C; then retry. |
