@@ -6,6 +6,8 @@
   const mode = element('mode');
   const dryRun = element('dry-run');
   let state = {busy: false, workspace: '', configured: false, trusted: true, remote: false};
+  let submitted;
+  let previousChat = '';
   const draft = api.getState();
   if (draft && typeof draft.prompt === 'string') prompt.value = draft.prompt.slice(0, 16000);
   if (draft && ['approve', 'read-only', 'auto-edit'].includes(draft.mode)) mode.value = draft.mode;
@@ -14,30 +16,130 @@
   function renderDraft() {
     element('counter').textContent = `${prompt.value.length.toLocaleString()} / 16,000`;
     const testing = state.busy && state.operation === 'probe';
-    element('run').textContent = testing ? 'Connection test running…' : 'Run task';
-    element('stop').textContent = testing ? 'Stop connection test' : 'Stop task';
+    element('run').textContent = testing ? 'Connection test running…' : 'Send';
+    element('stop').textContent = testing ? 'Stop connection test' :
+      state.operation === 'chat' ? 'Stop message' : 'Stop';
     element('run').disabled = state.busy || !state.workspace || !state.configured ||
       !state.trusted || state.remote || !prompt.value.trim();
     element('mode-note').textContent = dryRun.checked ? 'Preview edits only. Commands will not run.' :
       mode.value === 'read-only' ? 'Explore source only. Edits and commands are denied.' :
       mode.value === 'auto-edit' ? 'File edits apply automatically. Commands still need approval.' :
-      'Review edits and approve commands in the terminal.';
-    api.setState({prompt: prompt.value, mode: mode.value, dryRun: dryRun.checked});
+      'Review proposed changes and commands before they run.';
+    api.setState({prompt: prompt.value, mode: mode.value, dryRun: dryRun.checked,
+      project: state.project || draft?.project});
   }
   function send(type) { api.postMessage({type}); }
   function submit(event) {
     event?.preventDefault();
     if (element('run').disabled) return;
     element('run').disabled = true;
-    api.postMessage({type: 'run', prompt: prompt.value, mode: mode.value, dryRun: dryRun.checked});
+    submitted = {text: prompt.value, project: state.project, last: state.chat?.at(-1)?.id};
+    api.postMessage({type: 'chat', prompt: prompt.value, mode: mode.value, dryRun: dryRun.checked});
   }
+
+  function add(parent, tag, text, style) {
+    const node = document.createElement(tag);
+    node.textContent = text;
+    if (style) node.className = style;
+    parent.append(node);
+    return node;
+  }
+
+  function inline(parent, text) {
+    for (const part of text.split(/(`[^`\n]+`|\*\*[^*\n]+\*\*)/)) {
+      if (part.startsWith('`') && part.endsWith('`') && part.length > 2) add(parent, 'code', part.slice(1, -1));
+      else if (part.startsWith('**') && part.endsWith('**') && part.length > 4) add(parent, 'strong', part.slice(2, -2));
+      else parent.append(document.createTextNode(part));
+    }
+  }
+
+  function markdown(parent, reply) {
+    let code, list, paragraph;
+    for (const line of reply.split(/\r?\n/)) {
+      if (/^\s*```/.test(line)) {
+        code = code ? undefined : add(add(parent, 'pre', ''), 'code', '');
+        list = paragraph = undefined;
+      } else if (code) {
+        code.append(document.createTextNode(`${line}\n`));
+      } else if (!line.trim()) {
+        list = paragraph = undefined;
+      } else {
+        const heading = /^\s*#{1,6}\s+(.*)$/.exec(line);
+        const bullet = /^\s*([-*+]|\d+\.)\s+(.*)$/.exec(line);
+        if (heading) {
+          inline(add(parent, 'h3', ''), heading[1]);
+          list = paragraph = undefined;
+        } else if (bullet) {
+          const tag = /^\d/.test(bullet[1]) ? 'ol' : 'ul';
+          if (list?.localName !== tag) list = add(parent, tag, '');
+          inline(add(list, 'li', ''), bullet[2]);
+          paragraph = undefined;
+        } else {
+          list = undefined;
+          if (paragraph) paragraph.append(document.createTextNode('\n'));
+          else paragraph = add(parent, 'p', '');
+          inline(paragraph, line);
+        }
+      }
+    }
+  }
+
+  function renderChat(chat, canRun) {
+    const log = element('messages');
+    element('conversation').hidden = !canRun || !chat.length;
+    element('clear-chat').disabled = state.busy;
+    const snapshot = JSON.stringify(chat);
+    if (snapshot === previousChat) return;
+    previousChat = snapshot;
+    log.replaceChildren();
+    for (const turn of chat) {
+      const row = add(log, 'article', '', 'turn');
+      add(row, 'strong', 'You');
+      add(row, 'p', turn.user, 'utterance user-text');
+      if (turn.reply) {
+        add(row, 'strong', 'Copilot');
+        markdown(add(row, 'div', '', 'utterance reply'), turn.reply);
+      }
+      if (turn.error) add(row, 'p', turn.error, 'turn-error');
+      if (turn.files?.length || turn.checks?.length || turn.notes?.length || turn.previews?.length || turn.dryRun) {
+        const details = add(row, 'details', '');
+        add(details, 'summary', turn.dryRun ? 'Preview and details' : 'Changes and details');
+        for (const file of turn.files || []) add(details, 'p', `Changed ${file}`);
+        for (const check of turn.checks || []) {
+          const status = check.timed_out ? 'Timed out' : `Exit ${check.exit_code}`;
+          add(details, 'p', `${status} · ${check.argv.join(' ')}`);
+        }
+        for (const note of turn.notes || []) add(details, 'p', note);
+        for (const diff of turn.previews || []) add(details, 'pre', diff);
+      }
+    }
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function renderApproval(approval, allowed) {
+    element('approval').hidden = !allowed || !approval;
+    element('approval-title').textContent = approval?.source ? 'Share with Microsoft Copilot Web' : 'Review proposed action';
+    element('approval-message').textContent = approval?.message || '';
+    element('approval-diff').textContent = approval?.diff || '';
+    element('approval-diff').hidden = !approval?.diff;
+    element('approve').textContent = approval?.source ? 'Share and send' : 'Approve';
+    for (const id of ['approve', 'decline']) element(id).disabled = !approval;
+  }
+
+  function decide(approved) {
+    if (!state.approval) return;
+    api.postMessage({type: 'decision', id: state.approval.id, approved});
+    element('approve').disabled = element('decline').disabled = true;
+  }
+  element('approve').addEventListener('click', () => decide(true));
+  element('decline').addEventListener('click', () => decide(false));
   element('task-form').addEventListener('submit', submit);
   prompt.addEventListener('keydown', event => {
     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') submit(event);
   });
   for (const input of [prompt, mode, dryRun]) input.addEventListener('input', renderDraft);
   for (const id of ['login', 'probe', 'doctor', 'workspace', 'open-folder',
-    'stop', 'configure', 'copy-extension', 'copy-pairing']) {
+    'stop', 'configure', 'copy-extension', 'copy-pairing', 'clear-chat']) {
     element(id).addEventListener('click', () => send(id));
   }
   element('connect').addEventListener('click', () => send('edge-setup'));
@@ -46,7 +148,16 @@
   element('settings').addEventListener('click', () => send('configure'));
   window.addEventListener('message', event => {
     if (event.data?.type !== 'state') return;
+    const lastProject = state.project || draft?.project;
     state = event.data;
+    if (lastProject && state.project !== lastProject) prompt.value = '';
+    const lastTurn = state.chat?.at(-1);
+    if (lastTurn && submitted && submitted.project === state.project && lastTurn.id !== submitted.last &&
+        lastTurn.user === submitted.text.trim()) {
+      if (prompt.value === submitted.text) prompt.value = '';
+      submitted = undefined;
+    }
+    if (!state.busy) submitted = undefined;
     element('workspace-name').textContent = state.workspace || 'No project open';
     element('workspace-path').textContent = state.project || '';
     const allowed = state.trusted && !state.remote;
@@ -69,6 +180,8 @@
     element('panel-error').textContent = state.error || '';
     element('stop').hidden = !state.busy;
     element('stop').disabled = state.phase === 'preparing' || state.phase === 'stopping';
+    renderChat(state.chat || [], canRun);
+    renderApproval(state.approval, canRun);
     for (const id of ['connect', 'login', 'probe', 'doctor', 'workspace', 'settings',
       'configure', 'mode', 'dry-run', 'repair', 'retest', 'open-folder', 'copy-extension', 'copy-pairing']) {
       element(id).disabled = state.busy;

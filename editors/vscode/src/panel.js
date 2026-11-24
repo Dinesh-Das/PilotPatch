@@ -48,21 +48,31 @@ function renderPanel(webview, extensionUri, Uri) {
   <section class="execution" aria-label="Execution status">
     <p id="status" role="status" aria-live="polite"></p>
     <p id="panel-error" role="alert" hidden></p>
-    <button id="stop" type="button" class="secondary" hidden>Stop task</button>
+    <button id="stop" type="button" class="secondary" hidden>Stop</button>
+  </section>
+  <section id="conversation" aria-labelledby="conversation-title" hidden>
+    <div class="chat-header"><h2 id="conversation-title">Conversation</h2>
+      <button id="clear-chat" type="button" class="text-button">Clear conversation</button></div>
+    <div id="messages" role="log" aria-label="Chat messages" tabindex="0"></div>
+  </section>
+  <section id="approval" class="approval" aria-labelledby="approval-title" hidden>
+    <h2 id="approval-title"></h2><p id="approval-message"></p>
+    <pre id="approval-diff" aria-label="Proposed change" tabindex="0" hidden></pre>
+    <div class="approval-actions"><button id="approve" type="button" class="primary">Approve</button>
+      <button id="decline" type="button" class="secondary">Decline</button></div>
   </section>
   <form id="task-form" hidden>
-    <label for="prompt">What would you like to change?</label>
-    <textarea id="prompt" rows="8" maxlength="16000" spellcheck="false" placeholder="Add a health-check endpoint and cover it with tests." aria-describedby="prompt-help"></textarea>
-    <div class="composer-footer"><span id="prompt-help">Ctrl / ⌘ + Enter to run</span><span id="counter">0 / 16,000</span></div>
-    <details class="task-options"><summary>Task options</summary><div class="options">
+    <label for="prompt">Ask a question or request a change</label>
+    <textarea id="prompt" rows="3" maxlength="16000" spellcheck="false" placeholder="How does this project work?" aria-describedby="prompt-help"></textarea>
+    <div class="composer-footer"><span id="prompt-help">Ctrl / ⌘ + Enter to send</span><span id="counter">0 / 16,000</span></div>
+    <details class="task-options"><summary>Permissions and preview</summary><div class="options">
       <div class="mode"><label for="mode">Permissions</label><select id="mode">
         <option value="approve">Approve changes</option><option value="read-only">Read only</option>
         <option value="auto-edit">Auto-edit files</option></select></div>
       <label class="checkbox"><input id="dry-run" type="checkbox"> Preview only</label>
     </div>
-    <p id="mode-note" class="subtle">Review edits and approve commands in the terminal.</p></details>
-    <button id="run" type="submit" class="primary">Run task</button>
-    <p class="subtle">Review source sharing, edits and command approvals in the terminal.</p>
+    <p id="mode-note" class="subtle">Review proposed changes and commands before they run.</p></details>
+    <button id="run" type="submit" class="primary">Send</button>
   </form>
   <section id="activity-section" class="activity" hidden><h2>Recent activity</h2><ol id="activity"></ol></section>
 </main>

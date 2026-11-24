@@ -1,8 +1,8 @@
 # PilotPatch
 
 PilotPatch is a local coding assistant for Windows. It uses Microsoft Copilot Web to
-explain a project, propose edits and run checks you approve. Source sharing, edit approval
-and command approval happen in the terminal.
+explain a project, answer follow-up questions, propose edits and run checks you approve.
+The VS Code sidebar shows the conversation and asks for source sharing, edit and command approvals.
 
 ## Start in VS Code
 
@@ -18,7 +18,9 @@ From the PilotPatch folder in PowerShell:
 2. Open **PilotPatch** from Edge's Extensions menu. Choose the pairing file printed
    by setup if asked. Open Copilot, sign in, and click **Use this tab** in PilotPatch.
 3. Open your project in VS Code, click **PilotPatch**, then **Test connection**.
-   When Copilot replies, enter a task and click **Run task**.
+   When Copilot replies, ask a question or request a change and click **Send**.
+4. Click **Share and send** if authorized. Read Copilot’s reply in the sidebar, then
+   ask a follow-up or approve a proposed edit there.
 
 Setup installs Python dependencies and the VSIX, prepares the Edge files, opens the
 Extensions page, and copies the folder path. To reopen setup later, click
@@ -59,7 +61,7 @@ Copilot and GitHub Copilot are distinct services.
 
 See the latest audit for what was verified locally and which checks require your actual
 office device and account. [November 24 audit](docs/audit-2026-11-24.md)
-## Coding workflow
+## PowerShell coding workflow
 
 ```powershell
 copilot-agent run "Create a health-check endpoint and tests."

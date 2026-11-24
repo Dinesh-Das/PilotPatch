@@ -69,6 +69,26 @@ async def test_multistep_edit_duplicate_receipt_and_verified_report(tmp_path):
     assert loop.store.load(loop.state["id"])["status"] == "completed"
 
 
+async def test_chat_followup_includes_prior_exchange_and_actual_edit_receipt(tmp_path):
+    loop = make_loop(tmp_path, [final()])
+    loop.state["task"] = "Where is that setting used?"
+    await loop.run(
+        conversation=[
+            dict(
+                user="Find the flight speed setting",
+                assistant="It starts at FLIGHT_SPEED in settings.py.",
+                changed_files=["settings.py"],
+            )
+        ]
+    )
+    policy, payload = loop.provider.prompts[0].split("\n{", 1)
+    context = json.loads("{" + payload)
+    assert context["user_task"] == "Where is that setting used?"
+    assert context["conversation_untrusted"][0]["changed_files"] == ["settings.py"]
+    assert "FLIGHT_SPEED" in context["conversation_untrusted"][0]["assistant"]
+    assert "Markdown" in policy
+
+
 async def test_format_correction_is_bounded(tmp_path):
     loop = make_loop(tmp_path, ["bad", "bad", "bad"])
     with pytest.raises(AgentStopped, match="invalid protocol"):

@@ -1,8 +1,8 @@
 {
   "name": "pilotpatch",
   "displayName": "PilotPatch",
-  "description": "Prompt your workspace through the local Microsoft Copilot Web-only PilotPatch harness.",
-  "version": "0.2.6",
+  "description": "Chat about your workspace and review changes from Microsoft Copilot Web.",
+  "version": "0.3.0",
   "publisher": "pilotpatch-local",
   "license": "MIT",
   "repository": {
@@ -26,7 +26,7 @@
       "runId": {"type": "string", "description": "Unique local PilotPatch invocation."}
     }}],
     "commands": [
-      {"command": "pilotpatch.open", "title": "PilotPatch: Open Prompt Panel"},
+      {"command": "pilotpatch.open", "title": "PilotPatch: Open Chat"},
       {"command": "pilotpatch.configure", "title": "PilotPatch: Select Backend Python"},
       {"command": "pilotpatch.connect", "title": "PilotPatch: Open Edge Setup"},
       {"command": "pilotpatch.login", "title": "PilotPatch: Sign In to Microsoft Copilot"},
@@ -34,7 +34,7 @@
       {"command": "pilotpatch.doctor", "title": "PilotPatch: Check Setup"}
     ],
     "viewsContainers": {"activitybar": [{"id": "pilotpatch", "title": "PilotPatch", "icon": "media/pilotpatch.svg"}]},
-    "views": {"pilotpatch": [{"id": "pilotpatch.promptView", "name": "Prompt your project", "type": "webview"}]},
+    "views": {"pilotpatch": [{"id": "pilotpatch.promptView", "name": "Chat with your project", "type": "webview"}]},
     "configuration": {
       "title": "PilotPatch",
       "properties": {
@@ -47,7 +47,7 @@
   },
   "scripts": {"test": "node --test test/*.test.js"},
   "files": [
-    "src/controller.js", "src/extension.js", "src/panel.js", "src/request.js",
+    "src/chat.js", "src/controller.js", "src/extension.js", "src/panel.js", "src/request.js",
     "media/panel.css", "media/panel.js", "media/pilotpatch.svg", "README.md", "LICENSE"
   ],
   "devDependencies": {}

@@ -7,22 +7,30 @@ const crypto = require('node:crypto');
 const {execFile} = require('node:child_process');
 const {promisify} = require('node:util');
 const {parseRequest, buildInvocation} = require('./request');
+const {startChat} = require('./chat');
 const execute = promisify(execFile);
 
 class Controller {
   constructor(vscode, notify, home = path.join(process.env.LOCALAPPDATA ||
-    path.join(os.homedir(), '.local', 'share'), 'PilotPatch')) {
+    path.join(os.homedir(), '.local', 'share'), 'PilotPatch'), launchChat = startChat) {
     this.vscode = vscode;
     this.notify = notify;
     this.home = home;
     this.folder = undefined;
     this.active = undefined;
+    this.chats = new Map();
+    this.launchChat = launchChat;
     this.state = {phase: 'idle', message: '', busy: false, prepared: false, verified: false, activity: []};
     this.disposables = [
       vscode.tasks.onDidStartTaskProcess(event => this.started(event)),
       vscode.tasks.onDidEndTaskProcess(event => this.ended(event)),
       vscode.tasks.onDidEndTask(event => this.closed(event)),
-      vscode.workspace.onDidChangeWorkspaceFolders(() => this.publish()),
+      vscode.workspace.onDidChangeWorkspaceFolders(() => {
+        if (this.active?.type === 'chat' && this.active.key !== this.currentFolder()?.uri.toString()) {
+          this.stopChat();
+        }
+        this.publish();
+      }),
       vscode.workspace.onDidChangeConfiguration(event => {
         if (event.affectsConfiguration('pilotpatch')) {
           this.state.prepared = this.state.verified = false;
@@ -50,8 +58,10 @@ class Controller {
 
   publish() {
     const folder = this.currentFolder();
+    const key = folder?.uri.toString();
     this.notify({...this.state, workspace: folder?.name || '', project: folder?.uri.fsPath || '',
       operation: this.active?.type,
+      chat: this.chats.get(key) || [], approval: this.active?.key === key ? this.active?.approval : undefined,
       multiRoot: (this.vscode.workspace.workspaceFolders || []).length > 1,
       configured: Boolean(this.python()), trusted: this.vscode.workspace.isTrusted,
       remote: Boolean(this.vscode.env.remoteName)});
@@ -102,6 +112,12 @@ class Controller {
     try {
       const request = parseRequest(input);
       if (request.type === 'ready') return this.publish();
+      if (request.type === 'decision') return this.decide(request);
+      if (request.type === 'clear-chat') {
+        if (this.state.busy) throw new Error('Stop the current operation before clearing the conversation.');
+        this.chats.delete(this.currentFolder()?.uri.toString());
+        return this.update('idle', 'Conversation cleared in VS Code. For a fresh Copilot chat, start one in Edge.');
+      }
       if (this.state.busy && ['configure', 'workspace', 'open-folder'].includes(request.type)) {
         throw new Error('Wait for the current task before changing its workspace or backend.');
       }
@@ -119,6 +135,7 @@ class Controller {
         return;
       }
       if (request.type === 'stop') {
+        if (this.active?.type === 'chat') return this.stopChat();
         if (this.active?.execution) {
           this.active.stopping = true;
           this.update('stopping', this.active.type === 'probe' ? 'Stopping the connection test…' :
@@ -146,6 +163,7 @@ class Controller {
       'edge-setup': 'Preparing the extension folder and opening Edge setup…',
       probe: 'Connection test running. Wait for the result or stop the test to run your task.',
       doctor: 'Checking this laptop, project and Edge connection…',
+      chat: 'Preparing your message…',
     };
     this.update('preparing', starting[request.type] || 'Preparing the local task…', true);
     try {
@@ -157,9 +175,15 @@ class Controller {
       if (!(await fs.stat(python)).isFile()) {
         throw new Error('Backend Python is not a file. Rerun Windows setup or select installed Python.');
       }
+      if (request.type === 'chat') {
+        if (this.currentFolder()?.uri.toString() !== folder.uri.toString()) {
+          throw new Error('The selected project changed. Send again from the intended project.');
+        }
+        this.beginChat(invocation, request, folder);
+        return;
+      }
       const id = crypto.randomUUID();
-      const label = request.type === 'run' ? 'Task' :
-        request.type === 'edge-setup' ? 'Edge setup' : request.type[0].toUpperCase() + request.type.slice(1);
+      const label = request.type === 'edge-setup' ? 'Edge setup' : request.type[0].toUpperCase() + request.type.slice(1);
       const execution = new api.ProcessExecution(invocation.executable, invocation.args,
         {cwd: invocation.cwd, env: {PYTHONUTF8: '1'}});
       const task = new api.Task({type: 'pilotpatch', runId: id}, folder,
@@ -177,10 +201,91 @@ class Controller {
     }
   }
 
+  beginChat(invocation, request, folder) {
+    const key = folder.uri.toString();
+    const chat = this.chats.get(key) || [];
+    const conversation = chat.filter(turn => turn.reply).slice(-8).map(turn => ({
+      user: turn.user, assistant: turn.reply, changed_files: turn.files,
+    }));
+    // The protocol's first line is at most one MiB, including JSON escapes.
+    const payload = {prompt: request.prompt, conversation};
+    while (conversation.length && Buffer.byteLength(JSON.stringify(payload)) > 1000000) conversation.shift();
+    const active = {type: 'chat', key, chat, user: request.prompt};
+    this.active = active;
+    active.transport = this.launchChat(invocation, payload,
+      message => this.chatMessage(active, message),
+      code => this.chatClosed(active, code));
+    this.publish();
+  }
+
+  decide({id, approved}) {
+    const active = this.active;
+    if (!active?.approval || active.approval.id !== id || active.stopping ||
+        active.key !== this.currentFolder()?.uri.toString() || !this.vscode.workspace.isTrusted) return;
+    active.approval = undefined;
+    active.transport.decide({id, approved});
+    this.update('running', approved ? 'Approved. Continuing…' : 'Declined. Waiting for Copilot…');
+  }
+
+  stopChat() {
+    const active = this.active;
+    if (!active?.transport || active.stopping) return;
+    active.stopping = true;
+    active.approval = undefined;
+    active.transport.stop();
+    this.update('stopping', 'Stopping the current message…');
+  }
+
+  chatMessage(active, message) {
+    if (this.active !== active || active.stopping) return;
+    if (message.type === 'approval' && typeof message.id === 'string') {
+      active.approval = message;
+      this.update('running', message.source ? 'Approve source sharing to send.' : 'Review Copilot’s request below.');
+    } else if (message.type === 'session' && !active.turn) {
+      active.turn = {id: message.id, user: active.user, previews: []};
+      active.chat.push(active.turn);
+      if (active.chat.length > 24) active.chat.shift();
+      this.chats.set(active.key, active.chat);
+      this.publish();
+    } else if (message.type === 'progress') {
+      this.update('running', message.message);
+    } else if (message.type === 'preview' && active.turn) {
+      const previews = active.turn.previews;
+      if (previews.length < 4) {
+        previews.push(message.diff.length > 40000 ? `${message.diff.slice(0, 40000)}\n[Preview truncated]` : message.diff);
+        this.publish();
+      }
+    } else if (['reply', 'declined', 'error', 'stopped'].includes(message.type)) {
+      active.outcome = message;
+    }
+  }
+
+  chatClosed(active, code) {
+    if (this.active !== active) return;
+    const outcome = active.outcome;
+    this.active = undefined;
+    if (code === 0 && active.turn && outcome?.type === 'reply') {
+      const result = outcome.result;
+      Object.assign(active.turn, {reply: result.copilot.summary, notes: result.copilot.remaining_issues,
+        files: result.files_changed, checks: result.checks, dryRun: result.dry_run});
+      this.state.verified = true;
+      this.update('finished', '', false);
+      return;
+    }
+    const stopped = active.stopping || outcome?.type === 'stopped';
+    const declined = outcome?.type === 'declined';
+    const message = stopped ? (active.turn ? 'Stopped. Review the selected Edge chat and local changes.' :
+      'Stopped. Your message is still in the composer.') : outcome?.message ||
+      (active.turn ? 'The backend closed before returning a reply. Review Edge and local changes.' :
+        'PilotPatch could not start chat. Rerun setup to update the selected backend.');
+    if (active.turn) active.turn.error = message;
+    this.update(stopped ? 'stopped' : declined ? 'idle' : 'error', message, false);
+  }
+
   matches(event) { return this.active && event.execution.task.definition.runId === this.active.id; }
   started(event) {
     if (this.matches(event)) this.update('running', this.active.starting ||
-      'Running in the terminal. Review source sharing, diffs and approvals there.', true);
+      'Running a setup or diagnostic task in the terminal.', true);
   }
   ended(event) {
     if (!this.matches(event)) return;
@@ -191,7 +296,7 @@ class Controller {
       connect: 'Edge setup files are ready. Follow the steps in this panel.',
       'edge-setup': 'Next, click Load unpacked in Edge and paste the extension folder path.',
       login: 'Microsoft sign-in detected. Test the connection to verify a reply.',
-      probe: 'Copilot replied. Enter a task below.',
+      probe: 'Copilot replied. You can start chatting below.',
       doctor: 'Laptop, project and Copilot chat checks passed. Test connection to verify a reply.',
     };
     const failure = {
@@ -218,7 +323,10 @@ class Controller {
   closed(event) {
     if (this.matches(event)) this.ended({...event, exitCode: undefined});
   }
-  dispose() { for (const item of this.disposables) item.dispose(); }
+  dispose() {
+    if (this.active?.type === 'chat') this.active.transport?.stop();
+    for (const item of this.disposables) item.dispose();
+  }
 }
 
 module.exports = {Controller};

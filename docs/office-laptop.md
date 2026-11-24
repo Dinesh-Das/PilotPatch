@@ -1,13 +1,13 @@
 # Can I run PilotPatch on my office laptop?
 
 The supported target is Windows 11 x64 with approved 64-bit CPython 3.11–3.13,
-Git, Microsoft Edge 120 or newer and a local VS Code installation for the prompt panel.
+Git, Microsoft Edge 120 or newer and a local VS Code installation for the chat panel.
 Your organization must allow the extension, the loopback connection, browser automation
 and use of the intended Microsoft Copilot account for your project.
 
 ## Install it
 
-Transfer the `PilotPatch-Office-0.2.6.zip` produced by `build.cmd` through your
+Transfer the `PilotPatch-Office-0.3.0.zip` produced by `build.cmd` through your
 approved route. Extract it to a local folder you can write to, such as
 `%LOCALAPPDATA%\Programs\PilotPatch`. The bundle contains the Python dependency wheels,
 the VSIX and the source build files. Set up a fresh environment and pairing on each laptop.

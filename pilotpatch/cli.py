@@ -27,6 +27,7 @@ from pilotpatch.tools.filesystem import FileTools
 from pilotpatch.tools.registry import ToolRegistry
 from pilotpatch.tools.repository import Repository
 from pilotpatch.ui import terminal as ui
+from pilotpatch.ui.editor import EditorConsole
 
 COMMANDS = {
     "login",
@@ -41,6 +42,7 @@ COMMANDS = {
     "doctor",
     "connect",
     "register-editor",
+    "editor-chat",
 }
 
 
@@ -94,8 +96,8 @@ def parser() -> argparse.ArgumentParser:
     return result
 
 
-def _consent(args):
-    if not args.share_code and not ui.confirm(
+def _consent(args, confirm):
+    if not args.share_code and not confirm(
         "Send selected repository source, project instructions and tool results for this task to "
         "Microsoft Copilot at https://copilot.com/ using the account in the selected "
         "Edge connection? Confirm your organization permits this destination and account"
@@ -105,12 +107,14 @@ def _consent(args):
         )
 
 
-async def _task(args, config, store, state, *, resume=False):
-    _consent(args)
+async def _task(args, config, store, state, *, resume=False, output=ui, conversation=None):
+    if output is ui:
+        _consent(args, ui.confirm)
     project = Path(state["project"])
-    ui.banner(project)
-    ui.event(f"Session: {state['id']}")
-    permissions = Permissions(config.permission_mode, ui.confirm)
+    if output is ui:
+        ui.banner(project)
+        ui.event(f"Session: {state['id']}")
+    permissions = Permissions(config.permission_mode, output.confirm)
     repo = Repository(project, config)
     session_dir = store.directory(state["id"])
     lock = store.task_lock(state["id"])
@@ -119,25 +123,72 @@ async def _task(args, config, store, state, *, resume=False):
         with lock:
             if resume:
                 state = store.load(state["id"])
+            if output is not ui:
+                output.event("Connecting to your selected Copilot chat in Edge…")
             await provider.open()
             status = await provider.status()
-            ui.event(f"Microsoft session: {status}")
+            if output is ui:
+                ui.event(f"Microsoft session: {status}")
             if not status["chat_ready"]:
                 raise RuntimeError(
                     "Copilot chat is not ready. In Edge, open the selected chat and check your "
                     "Microsoft sign-in. Run Test connection before retrying."
                 )
             files = FileTools(
-                repo, session_dir, permissions, dry_run=state["dry_run"], preview=ui.preview
+                repo, session_dir, permissions, dry_run=state["dry_run"], preview=output.preview
             )
             tools = ToolRegistry(files, CommandRunner(repo, permissions, state["dry_run"]))
-            loop = AgentLoop(provider, tools, store, state, ui.event)
-            result = await loop.run(resume=resume, resolve_pending=args.resolve_pending == "skip")
-            ui.report(result)
+            loop = AgentLoop(provider, tools, store, state, output.event)
+            result = await loop.run(
+                resume=resume,
+                resolve_pending=args.resolve_pending == "skip",
+                conversation=conversation,
+            )
     except Timeout as exc:
         raise RuntimeError("This task is already running in another process") from exc
     finally:
         await provider.close()
+    return result
+
+
+async def _editor_chat(args, config, store) -> int:
+    output = EditorConsole(dry_run=args.dry_run)
+    state = None
+    try:
+        if args.arguments or args.share_code:
+            raise ValueError("Editor messages and source approvals must come from the editor")
+        request = output.start()
+        if not output.confirm(
+            "Send your message, recent conversation, selected project files, instructions and "
+            "tool results to Microsoft Copilot Web? Confirm your organization permits sharing "
+            "with this destination and the account in the selected Edge chat.",
+            source=True,
+        ):
+            output.emit("declined", message="Message was not sent. Source sharing was declined.")
+            return 0
+        Repository(args.project, config)
+        state = store.create(args.project, request.prompt, args.dry_run)
+        output.emit("session", id=state["id"])
+        result = await _task(
+            args,
+            config,
+            store,
+            state,
+            output=output,
+            conversation=[exchange.model_dump() for exchange in request.conversation],
+        )
+        output.emit("reply", result=result)
+        return 0
+    except asyncio.CancelledError:
+        output.emit("stopped", message="Stopped. Review the selected Edge chat and local changes.")
+        return 130
+    except Exception as exc:
+        # Validation errors can embed the full input including a user's draft.
+        from pydantic import ValidationError
+
+        message = "Invalid editor chat request" if isinstance(exc, ValidationError) else str(exc)
+        output.emit("error", message=message)
+        return 1
 
 
 async def _browser_command(command, args, config):
@@ -481,6 +532,8 @@ async def dispatch(args) -> int:
         return 0
     store = SessionStore(args.home)
     store.prune(config.retention_days)
+    if command == "editor-chat":
+        return await _editor_chat(args, config, store)
     if command == "history":
         ui.event(json.dumps(store.history(), indent=2))
     elif command == "diff":
@@ -499,14 +552,14 @@ async def dispatch(args) -> int:
         resumed_project = await asyncio.to_thread(Path(state["project"]).resolve)
         if args.home.is_relative_to(resumed_project):
             raise ValueError("State directory must be outside resumed project")
-        await _task(args, config, store, state, resume=True)
+        ui.report(await _task(args, config, store, state, resume=True))
     else:
         task = " ".join(args.arguments if command == "run" else [command, *args.arguments]).strip()
         if not task:
             raise ValueError("Provide a task instruction")
         Repository(project, config)  # Validate before creating persistent task state.
         state = store.create(project, task, args.dry_run)
-        await _task(args, config, store, state)
+        ui.report(await _task(args, config, store, state))
     return 0
 
 

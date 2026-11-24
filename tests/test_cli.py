@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import subprocess
@@ -61,6 +62,108 @@ def test_editor_registration_and_literal_prompt(tmp_path):
     args = parser().parse_intermixed_args(["run", "--", "--share-code"])
     assert args.arguments == ["--share-code"]
     assert not args.share_code
+
+
+@pytest.mark.parametrize(
+    "decision", ["decline-source", "decline-edit", "approve-edit", "preview", "stop"]
+)
+async def test_editor_chat_pipe_only_applies_an_approved_edit(tmp_path, decision):
+    # All I/O is real except the Copilot provider, which is replaced only in this test process.
+    bootstrap = """
+import json
+from pilotpatch import cli
+
+class FixtureCopilot:
+    async def open(self):
+        pass
+    async def close(self):
+        pass
+    async def status(self):
+        return {'chat_ready': True}
+    async def send(self, text):
+        if text.startswith('You are Microsoft Copilot'):
+            message = dict(type='tool_call', id='write1', tool='write_file',
+                           arguments=dict(path='answer.py', content='answer = 42\\n'))
+        else:
+            message = dict(type='final', summary='Here is what happened.', tests='',
+                           files_changed=['answer.py'], remaining_issues=[])
+        return json.dumps(message)
+
+cli.browser_provider = lambda *_: FixtureCopilot()
+cli.main()
+"""
+    project = tmp_path / "project"
+    project.mkdir()
+    home = tmp_path / "private"
+    child = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-B",
+        "-I",
+        "-c",
+        bootstrap,
+        "--home",
+        str(home),
+        "--project",
+        str(project),
+        "--mode",
+        "approve",
+        *(["--dry-run"] if decision == "preview" else []),
+        "editor-chat",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+    )
+
+    async def read(kind):
+        while line := await asyncio.wait_for(child.stdout.readline(), timeout=10):
+            event = json.loads(line)
+            if event["type"] == kind:
+                return event
+        pytest.fail(f"Chat pipe closed before event {kind}")
+
+    async def send(value):
+        child.stdin.write(json.dumps(value).encode() + b"\n")
+        await child.stdin.drain()
+
+    try:
+        await send(dict(prompt="Add the answer", conversation=[]))
+        source = await read("approval")
+        assert source["source"] is True
+        await send(dict(id=source["id"], approved=decision != "decline-source"))
+        if decision == "decline-source":
+            await read("declined")
+            assert not list((home / "sessions").iterdir())
+        elif decision == "preview":
+            assert "+answer = 42" in (await read("preview"))["diff"]
+            answer = await read("reply")
+            assert answer["result"]["dry_run"] is True
+            assert answer["result"]["files_changed"] == []
+        else:
+            session = await read("session")
+            edit = await read("approval")
+            assert edit["source"] is False
+            assert "+answer = 42" in edit["diff"]
+            assert not (project / "answer.py").exists()
+            # A duplicate source-sharing acknowledgement cannot approve a file edit.
+            await send(dict(id=source["id"], approved=True))
+            if decision == "stop":
+                child.stdin.close()
+                await read("stopped")
+                state = json.loads((home / "sessions" / session["id"] / "state.json").read_text())
+                assert state["pending"]["id"] == "write1"
+            else:
+                await send(dict(id=edit["id"], approved=decision == "approve-edit"))
+                answer = await read("reply")
+                verified_files = ["answer.py"] if decision == "approve-edit" else []
+                assert answer["result"]["files_changed"] == verified_files
+        assert await asyncio.wait_for(child.wait(), timeout=10) == (
+            130 if decision == "stop" else 0
+        )
+        assert (project / "answer.py").exists() is (decision == "approve-edit")
+    finally:
+        child.stdin.close()
+        if child.returncode is None:
+            child.kill()
+            await child.wait()
 
 
 async def test_login_reports_sign_in_separately_from_chat_service_error(tmp_path, monkeypatch):

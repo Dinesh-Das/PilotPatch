@@ -16,7 +16,7 @@ $TargetProject = 'C:\Work\YourProject'
 $PilotPatchPython = Join-Path $PilotPatchRoot '.venv\Scripts\python.exe'
 $PilotPatchCli = Join-Path $PilotPatchRoot 'copilot.cmd'
 $PilotPatchState = Join-Path $env:LOCALAPPDATA 'PilotPatch'
-$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.2.6.vsix'
+$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.3.0.vsix'
 ```
 
 ## 2. Install the Python backend
@@ -47,7 +47,7 @@ online pip steps:
 ```powershell
 $PilotPatchWheels = Join-Path $PilotPatchRoot 'wheelhouse'
 & $PilotPatchPython -I -m pip install --no-index --find-links $PilotPatchWheels --only-binary=:all: -r (Join-Path $PilotPatchRoot 'requirements.txt')
-& $PilotPatchPython -I -m pip install --no-index --no-deps (Join-Path $PilotPatchRoot 'dist\pilotpatch-0.2.6-py3-none-any.whl')
+& $PilotPatchPython -I -m pip install --no-index --no-deps (Join-Path $PilotPatchRoot 'dist\pilotpatch-0.3.0-py3-none-any.whl')
 ```
 
 If you installed manually, use **Extensions → … → Install from VSIX…** in VS Code
@@ -90,11 +90,12 @@ while the test waits to wake it immediately. If the test fails, follow the termi
 message. **Check Microsoft sign-in** in the panel or `login` in the CLI diagnoses
 account controls. `status` checks chat readiness without submitting a prompt.
 
-## 5. Run from the prompt panel
+## 5. Chat in VS Code
 
-When connection testing succeeds, enter a task and click **Run task** or press
-**Ctrl+Enter**. Review source sharing, diffs, command permissions and actual results
-in the terminal. **Task options** contains the permission mode and **Preview only**.
+When connection testing succeeds, ask a question or request a change. Click **Send**
+or press **Ctrl+Enter**, then click **Share and send** if authorized. Read replies and
+review proposed edits and commands in the sidebar. Ask follow-up questions in the
+same panel. **Permissions and preview** contains the permission mode and **Preview only**.
 **Troubleshooting** contains **Check this laptop** and setup recovery.
 
 For Cursor and compatible local desktop forks, run the setup command without
@@ -320,7 +321,7 @@ tab without submitting a model prompt:
 | Existing Edge is not paired | Run `connect`, load the unpacked extension in the current profile, then choose the pairing file and tab. |
 | No existing Edge tab connected | Keep Edge open. Check that the extension is enabled in that profile, choose the tab, click Reconnect while the CLI waits. |
 | Another PilotPatch browser task is active | Finish it or stop that specific task with Ctrl+C; then retry. |
-| Run task is disabled during a connection test | Wait for the result or click **Stop connection test**. Your typed task stays in the panel. |
+| Send is disabled during a connection test | Wait for the result or click **Stop connection test**. Your draft stays in the panel. |
 | Copilot is signed in but account controls are unrecognized | Open Copilot's own account menu so its Sign out/account controls are visible, then retry `login` or `status`. |
 | `service_error` or the red request-failed banner | Inspect/refresh the Copilot tab manually, confirm normal chat works, then rerun `status` and `probe`. Re-pairing alone does not prove the service recovered. |
 | Unsent draft in the selected tab | Send or clear that draft yourself. PilotPatch preserves it instead of overwriting it. |

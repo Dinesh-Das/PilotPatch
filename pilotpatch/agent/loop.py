@@ -37,7 +37,13 @@ class AgentLoop:
         self.config = registry.files.repo.config
         self.event = event
 
-    async def run(self, *, resume: bool = False, resolve_pending: bool = False) -> dict:
+    async def run(
+        self,
+        *,
+        resume: bool = False,
+        resolve_pending: bool = False,
+        conversation: list[dict] | None = None,
+    ) -> dict:
         state = self.state
         if state["status"] == "completed":
             return state["final"]
@@ -65,7 +71,11 @@ class AgentLoop:
             state["messages"].append(dict(role="tool", content=result))
             state["pending"] = None
             self.store.save(state)
-        prompt = self.context.resume(state) if resume else self.context.initial(state["task"])
+        prompt = (
+            self.context.resume(state)
+            if resume
+            else self.context.initial(state["task"], conversation)
+        )
         counts = Counter(r["fingerprint"] for r in state["receipts"].values())
         corrections = 0
         try:

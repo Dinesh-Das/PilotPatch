@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 — 2026-11-24
+
+- Chat about a project in the VS Code sidebar. Copilot replies inline and recent
+  exchanges give follow-up questions context.
+- Approve source sharing, review diffs and approve commands in the same sidebar.
+  Show applied files and actual command results alongside Copilot’s reply.
+
 ## 0.2.6 — 2026-11-24
 
 - Read the visible Copilot reply when the message also contains an empty

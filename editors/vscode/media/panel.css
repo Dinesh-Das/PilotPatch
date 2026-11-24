@@ -33,7 +33,7 @@ p { margin: 6px 0 10px; }
 #status[data-phase="error"], #panel-error { color: var(--error); }
 #status[data-phase="running"], #status[data-phase="finished"] { color: var(--link); }
 label { display: block; margin-bottom: 5px; }
-textarea { display: block; width: 100%; min-height: 105px; resize: vertical; padding: 8px; border: 1px solid var(--vscode-input-border, var(--line)); border-radius: 3px; background: var(--vscode-input-background, #242424); color: var(--vscode-input-foreground, #eee); }
+textarea { display: block; width: 100%; min-height: 72px; resize: vertical; padding: 8px; border: 1px solid var(--vscode-input-border, var(--line)); border-radius: 3px; background: var(--vscode-input-background, #242424); color: var(--vscode-input-foreground, #eee); }
 textarea::placeholder { color: var(--vscode-input-placeholderForeground, #aaa); opacity: 1; }
 .composer-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 8px; font-size: 11px; margin: 4px 0 8px; }
 summary { cursor: pointer; }
@@ -51,4 +51,19 @@ input[type="checkbox"] { margin: 0; accent-color: var(--link); }
 .tools { display: grid; justify-items: start; gap: 6px; margin-top: 8px; }
 .text-button { background: transparent; color: var(--link); padding: 0; text-align: left; }
 .text-button:hover:enabled { text-decoration: underline; }
+.chat-header, .approval-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.chat-header { justify-content: space-between; }
+#messages { max-height: min(48vh, 580px); overflow-y: auto; margin: 4px 0 16px; padding: 2px; }
+.turn { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.utterance { margin: 4px 0 10px; }
+.user-text { padding: 6px 8px; border-left: 2px solid var(--link); white-space: pre-wrap; }
+.reply p, .reply li { white-space: pre-wrap; }
+.reply p, .reply ul, .reply ol, .reply h3 { margin: 5px 0; }
+.reply ul, .reply ol { padding-inline-start: 20px; }
+.turn strong, .turn details { overflow-wrap: anywhere; }
+.turn-error { color: var(--error); }
+.approval { border: 1px solid var(--line); padding: 10px; margin: 0 0 16px; }
+.approval p { white-space: pre-wrap; }
+.approval-actions .primary { width: auto; }
+pre { font: var(--vscode-editor-font-size, 12px)/1.4 var(--vscode-editor-font-family, monospace); white-space: pre; overflow: auto; max-height: 40vh; padding: 8px; background: var(--vscode-textCodeBlock-background, #222); }
 @media (min-width: 600px) { body { max-width: 680px; padding: 24px; margin: auto; } }
