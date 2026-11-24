@@ -28,6 +28,7 @@ class Selectors(StrictModel):
     # A code-block Copy button can appear during streaming; require a message control.
     completion: str = 'button[aria-label="Copy message" i]'
     signed_in: str = (
+        '[aria-label="Copilot navigation"] [role="button"][aria-label$=", Personal account" i], '
         'button[aria-label*="account" i], button[aria-label*="profile" i], '
         'button[title*="profile" i], [data-testid="user-avatar"], '
         '[data-testid="account-menu-button"], [data-testid="user-menu-button"], '

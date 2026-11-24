@@ -103,6 +103,29 @@ async def test_existing_tab_round_trip_and_multiple_turns(connected_edge):
 
 
 @pytest.mark.browser
+async def test_personal_account_control_in_copilot_navigation(connected_edge):
+    provider, page, _ = connected_edge
+    await page.get_by_role("button", name="Account", exact=True).evaluate("""element => {
+      element.outerHTML = '<nav aria-label="Copilot navigation">' +
+        '<div role="button" aria-label="Fixture User, Personal account">FU</div></nav>';
+    }""")
+    status = await provider.status()
+    assert status["authenticated"] and status["chat_ready"]
+    assert status["account_control_count"] == 1
+
+    await page.locator("nav").evaluate("element => element.removeAttribute('aria-label')")
+    assert not (await provider.status())["authenticated"]
+
+    await page.locator("nav").evaluate("""element => {
+      element.setAttribute('aria-label', 'Copilot navigation');
+      element.insertAdjacentHTML('beforeend', '<button>Sign in</button>');
+    }""")
+    status = await provider.status()
+    assert status["state"] == "sign_in_required"
+    assert not status["authenticated"]
+
+
+@pytest.mark.browser
 async def test_toolbar_popup_pairs_and_never_switches_tabs_on_its_own(connected_edge, tmp_path):
     provider, page, worker = connected_edge
     file = tmp_path / "popup-pairing.json"

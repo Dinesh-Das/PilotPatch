@@ -6,6 +6,8 @@
   **Open Edge setup** in VS Code, `copilot.cmd connect --open-edge`, or the Windows
   setup switch `-OpenEdgeSetup`.
 - Clarify the folder picker steps and display the extension as **PilotPatch** in Edge.
+- Recognize Copilot's signed-in personal account control in the navigation sidebar
+  so the connection check can proceed with the account menu closed.
 
 ## 0.2.3 — 2026-11-24
 
