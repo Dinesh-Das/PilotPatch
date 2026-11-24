@@ -51,6 +51,7 @@ class Controller {
   publish() {
     const folder = this.currentFolder();
     this.notify({...this.state, workspace: folder?.name || '', project: folder?.uri.fsPath || '',
+      operation: this.active?.type,
       multiRoot: (this.vscode.workspace.workspaceFolders || []).length > 1,
       configured: Boolean(this.python()), trusted: this.vscode.workspace.isTrusted,
       remote: Boolean(this.vscode.env.remoteName)});
@@ -120,7 +121,8 @@ class Controller {
       if (request.type === 'stop') {
         if (this.active?.execution) {
           this.active.stopping = true;
-          this.update('stopping', 'Stopping. Review the terminal and saved session before resuming.');
+          this.update('stopping', this.active.type === 'probe' ? 'Stopping the connection test…' :
+            'Stopping. Review the terminal and saved session before resuming.');
           this.active.execution.terminate();
         }
         return;
@@ -142,7 +144,7 @@ class Controller {
     const starting = {
       connect: 'Preparing your Edge extension files…',
       'edge-setup': 'Preparing the extension folder and opening Edge setup…',
-      probe: 'Waiting for Edge. The test sends a short message with no project files.',
+      probe: 'Connection test running. Wait for the result or stop the test to run your task.',
       doctor: 'Checking this laptop, project and Edge connection…',
     };
     this.update('preparing', starting[request.type] || 'Preparing the local task…', true);
@@ -195,10 +197,11 @@ class Controller {
     const failure = {
       connect: 'Edge setup could not prepare its files. See the terminal for the failed step.',
       'edge-setup': 'Edge setup could not prepare its files. See the terminal for the failed step.',
-      probe: 'Copilot connection check failed. Open PilotPatch in Edge, choose the intended tab and check the terminal.',
+      probe: 'The test ended before a reply was verified. See the terminal for the reason.',
       doctor: 'A setup check failed. See the terminal for the result and next step.',
     };
-    const message = stopped ? 'Stopped. Inspect the saved session before resuming.' :
+    const message = stopped ? (type === 'probe' ? 'Connection test stopped. Your task draft is ready.' :
+      'Stopped. Inspect the saved session before resuming.') :
       succeeded ? (success[type] || 'Finished. See the terminal for results and any checks.') :
         failure[type] ||
         `Process ended${Number.isInteger(event.exitCode) ? ` with exit ${event.exitCode}` : ''}. Check the terminal for details.`;

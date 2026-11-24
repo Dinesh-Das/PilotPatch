@@ -13,6 +13,9 @@
 
   function renderDraft() {
     element('counter').textContent = `${prompt.value.length.toLocaleString()} / 16,000`;
+    const testing = state.busy && state.operation === 'probe';
+    element('run').textContent = testing ? 'Connection test running…' : 'Run task';
+    element('stop').textContent = testing ? 'Stop connection test' : 'Stop task';
     element('run').disabled = state.busy || !state.workspace || !state.configured ||
       !state.trusted || state.remote || !prompt.value.trim();
     element('mode-note').textContent = dryRun.checked ? 'Preview edits only. Commands will not run.' :

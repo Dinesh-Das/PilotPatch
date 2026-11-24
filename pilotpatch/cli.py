@@ -207,6 +207,7 @@ async def _browser_command(command, args, config):
         elif command == "probe":
             from secrets import token_hex
 
+            ui.event("Edge connected. Testing the selected Copilot chat and waiting for a reply.")
             nonce = token_hex(8)
             token = f"PILOTPATCH_OK_{nonce}"
             response = await provider.send(

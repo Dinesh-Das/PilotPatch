@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.6 — 2026-11-24
+
+- Read the visible Copilot reply when the message also contains an empty
+  placeholder. Keep the reply tied to the submitted turn.
+- Explain why Run task is disabled during a connection test and provide a
+  **Stop connection test** button. The terminal reports when Edge connects.
+
 ## 0.2.5 — 2026-11-24
 
 - Support Copilot's current rich composer, message layout, and **Copy Response**

@@ -16,7 +16,7 @@ $TargetProject = 'C:\Work\YourProject'
 $PilotPatchPython = Join-Path $PilotPatchRoot '.venv\Scripts\python.exe'
 $PilotPatchCli = Join-Path $PilotPatchRoot 'copilot.cmd'
 $PilotPatchState = Join-Path $env:LOCALAPPDATA 'PilotPatch'
-$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.2.5.vsix'
+$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.2.6.vsix'
 ```
 
 ## 2. Install the Python backend
@@ -47,7 +47,7 @@ online pip steps:
 ```powershell
 $PilotPatchWheels = Join-Path $PilotPatchRoot 'wheelhouse'
 & $PilotPatchPython -I -m pip install --no-index --find-links $PilotPatchWheels --only-binary=:all: -r (Join-Path $PilotPatchRoot 'requirements.txt')
-& $PilotPatchPython -I -m pip install --no-index --no-deps (Join-Path $PilotPatchRoot 'dist\pilotpatch-0.2.5-py3-none-any.whl')
+& $PilotPatchPython -I -m pip install --no-index --no-deps (Join-Path $PilotPatchRoot 'dist\pilotpatch-0.2.6-py3-none-any.whl')
 ```
 
 If you installed manually, use **Extensions → … → Install from VSIX…** in VS Code
@@ -320,6 +320,7 @@ tab without submitting a model prompt:
 | Existing Edge is not paired | Run `connect`, load the unpacked extension in the current profile, then choose the pairing file and tab. |
 | No existing Edge tab connected | Keep Edge open. Check that the extension is enabled in that profile, choose the tab, click Reconnect while the CLI waits. |
 | Another PilotPatch browser task is active | Finish it or stop that specific task with Ctrl+C; then retry. |
+| Run task is disabled during a connection test | Wait for the result or click **Stop connection test**. Your typed task stays in the panel. |
 | Copilot is signed in but account controls are unrecognized | Open Copilot's own account menu so its Sign out/account controls are visible, then retry `login` or `status`. |
 | `service_error` or the red request-failed banner | Inspect/refresh the Copilot tab manually, confirm normal chat works, then rerun `status` and `probe`. Re-pairing alone does not prove the service recovered. |
 | Unsent draft in the selected tab | Send or clear that draft yourself. PilotPatch preserves it instead of overwriting it. |

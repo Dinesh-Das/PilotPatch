@@ -111,6 +111,8 @@ test('uses the registered backend and copies only paths for successful setup', a
   await f.controller.handle({type: 'copy-pairing'});
   assert.equal(clipboard, path.join(home, 'edge-pairing.json'));
   await f.controller.handle({type: 'probe'});
+  assert.equal(f.updates.at(-1).operation, 'probe');
   f.listeners.end({execution: f.tasks[1], exitCode: 0});
   assert.equal(f.updates.at(-1).verified, true);
+  assert.equal(f.updates.at(-1).busy, false);
 });

@@ -126,6 +126,21 @@ async def test_panel_guides_first_setup_and_hides_steps_after_verified_reply(edi
 
 
 @pytest.mark.browser
+async def test_connection_test_explains_blocked_run_and_releases_preserved_draft(editor_panel):
+    page, _ = editor_panel
+    await publish(page)
+    prompt = page.get_by_label("What would you like to change?")
+    await prompt.fill("Give me an overview of the codebase")
+    await publish(page, phase="running", busy=True, operation="probe")
+    assert await page.get_by_role("button", name="Connection test running…").is_disabled()
+    await page.get_by_role("button", name="Stop connection test").click()
+    assert await page.evaluate("window.panelMessages.at(-1)") == {"type": "stop"}
+    await publish(page, phase="finished", verified=True)
+    assert await page.get_by_role("button", name="Run task").is_enabled()
+    assert await prompt.input_value() == "Give me an overview of the codebase"
+
+
+@pytest.mark.browser
 async def test_panel_responsive_layout_and_screenshot(editor_panel):
     page, _ = editor_panel
     await publish(page)

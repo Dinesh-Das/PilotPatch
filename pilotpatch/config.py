@@ -26,9 +26,14 @@ class Selectors(StrictModel):
         '[data-content="ai-message"], [data-testid="assistant-message"], '
         '[data-testid="copilot-message-reply-div"] '
         '[role="article"][aria-labelledby^="copilot-message-"]'
-        ':has([data-testid="chat-response-message"])'
+        ':has(.fai-CopilotMessage__content, [data-testid="chat-response-message"])'
     )
-    assistant_body: str = '[data-testid="chat-response-message"]'
+    # Copilot can render an empty chat-response-message beside its visible text.
+    # Read the outer content block once and support older layouts that lack it.
+    assistant_body: str = (
+        ".fai-CopilotMessage__content, "
+        '[data-testid="chat-response-message"]:not(.fai-CopilotMessage__content *)'
+    )
     user: str = (
         '[data-content="user-message"], [data-testid="user-message"], '
         '[data-testid="chatQuestion"] [role="article"][aria-labelledby^="user-message-"]'

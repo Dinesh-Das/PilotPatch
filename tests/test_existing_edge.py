@@ -63,11 +63,12 @@ function send() {
     'aria-labelledby="user-message-fixture"><h5>You said:</h5><div class="draft"></div>' +
     '</div></div><div data-testid="copilot-message-reply-div"><div role="article" ' +
     'aria-labelledby="copilot-message-fixture"><h6>Copilot said:</h6>' +
-    '<div data-testid="chat-response-message">Partial reply</div></div></div>';
+    '<div class="fai-CopilotMessage__content"><div data-testid="chat-response-message"></div>' +
+    '<div data-testid="markdown-reply">Partial reply</div></div></div></div>';
   turn.querySelector('.draft').textContent = text;
   document.body.append(turn);
   setTimeout(() => {
-    turn.querySelector('[data-testid="chat-response-message"]').textContent =
+    turn.querySelector('[data-testid="markdown-reply"]').textContent =
       'Complete modern reply ' + count + '.';
     turn.querySelector('[aria-labelledby="copilot-message-fixture"]').insertAdjacentHTML(
       'beforeend', '<div role="toolbar"><button aria-label="Copy Response">Copy</button></div>');
