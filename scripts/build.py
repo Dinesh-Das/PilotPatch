@@ -275,8 +275,8 @@ def main():
             path.replace(target)
             print(f"{label} saved to {target}", flush=True)
         print(
-            r"For Edge's Load unpacked dialog, run .\setup-windows.ps1 and select the "
-            "edge-extension folder it prints. That folder contains manifest.json.",
+            r"Run .\setup-windows.ps1 -OpenEdgeSetup to open Edge Extensions and copy "
+            "the folder for Load unpacked.",
             flush=True,
         )
 

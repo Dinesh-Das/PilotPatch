@@ -9,12 +9,13 @@ proposed changes, command approvals and the actual results.
 From the PilotPatch folder in PowerShell, run:
 
 ```powershell
-.\setup-windows.ps1 -InstallEditor
+.\setup-windows.ps1 -InstallEditor -OpenEdgeSetup
 ```
 
 Open your project folder in VS Code, click **PilotPatch** in the activity bar,
-and choose **Set up Copilot**. The panel tells you where to load the extension in
-Edge and lets you copy the folder and pairing file paths. In the Edge extension,
+and choose **Open Edge setup** if the extension still needs installing. It opens
+Edge Extensions and copies the folder path. The panel also lets you copy the pairing
+file path. In the Edge extension,
 click **Use this tab**. Back in VS Code, click **Test connection**. When Copilot
 replies, enter a task and click **Run task** or press **Ctrl+Enter**.
 

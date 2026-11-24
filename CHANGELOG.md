@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.4 — 2026-11-24
+
+- Open Edge Extensions and copy the unpacked folder path in one action. Use
+  **Open Edge setup** in VS Code, `copilot.cmd connect --open-edge`, or the Windows
+  setup switch `-OpenEdgeSetup`.
+- Clarify the folder picker steps and display the extension as **PilotPatch** in Edge.
+
 ## 0.2.3 — 2026-11-24
 
 - Build the wheel, source distribution, VSIX, Edge ZIP and offline Windows bundle

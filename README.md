@@ -9,18 +9,20 @@ and command approval happen in the terminal.
 From the PilotPatch folder in PowerShell:
 
 ```powershell
-.\setup-windows.ps1 -InstallEditor
+.\setup-windows.ps1 -InstallEditor -OpenEdgeSetup
 ```
 
-1. In your Edge profile, go to `edge://extensions`, turn on **Developer mode**, and
-   click **Load unpacked**. Paste the `edge-extension` folder printed by setup.
+1. In your intended Edge profile, turn on **Developer mode** on the Extensions page
+   and click **Load unpacked**. In the folder picker, press **Ctrl+L**, **Ctrl+V** and
+   **Enter**, then click **Select Folder**.
 2. Open **PilotPatch** from Edge's Extensions menu. Choose the pairing file printed
    by setup if asked. Open Copilot, sign in, and click **Use this tab** in PilotPatch.
 3. Open your project in VS Code, click **PilotPatch**, then **Test connection**.
    When Copilot replies, enter a task and click **Run task**.
 
-The setup command installs Python dependencies, prepares the Edge files, registers the
-backend with the editor, and builds the VSIX if it is missing. You need Windows 11 x64,
+Setup installs Python dependencies and the VSIX, prepares the Edge files, opens the
+Extensions page, and copies the folder path. To reopen setup later, click
+**Open Edge setup** in the PilotPatch panel. You need Windows 11 x64,
 approved 64-bit CPython 3.11–3.13, Git, Edge 120+ and local VS Code. See setup for
 Cursor, CLI-only installation and restricted PowerShell.
 [Full setup guide](setup.md)
@@ -34,7 +36,8 @@ Cursor, CLI-only installation and restricted PowerShell.
 Look in `artifacts` for the Python wheel and source archive, VSIX, Edge ZIP and Windows
 offline bundle. The build uses Python and your approved Python package index. For a
 local index, use `--wheelhouse PATH`. Use `--no-office` to skip the offline bundle.
-For **Load unpacked** in Edge, use the `edge-extension` folder printed by Windows setup.
+For Edge installation, run Windows setup with `-OpenEdgeSetup` to open Extensions
+and copy the folder path.
 [Contributor checks](CONTRIBUTING.md)
 
 ## Account and data destination

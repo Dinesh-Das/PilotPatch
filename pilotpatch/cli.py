@@ -21,6 +21,7 @@ from pilotpatch.providers.factory import browser_provider
 from pilotpatch.security.permissions import Permissions
 from pilotpatch.security.redaction import redact
 from pilotpatch.security.storage import atomic_bytes, atomic_json, private_directory
+from pilotpatch.security.system import windows_binary
 from pilotpatch.tools.command_runner import CommandRunner
 from pilotpatch.tools.filesystem import FileTools
 from pilotpatch.tools.registry import ToolRegistry
@@ -81,6 +82,11 @@ def parser() -> argparse.ArgumentParser:
     )
     result.add_argument(
         "--offline", action="store_true", help="doctor: skip network/browser navigation"
+    )
+    result.add_argument(
+        "--open-edge",
+        action="store_true",
+        help="connect: open Edge Extensions and copy the unpacked extension folder on Windows",
     )
     result.add_argument("--init", action="store_true", help="config: write a default global config")
     result.add_argument("command_or_task", nargs="?")
@@ -281,14 +287,7 @@ async def _doctor(args, config):
                 pass
     for name in ["playwright", "pydantic", "rich", "pathspec", "filelock", "PyYAML"]:
         results[name] = importlib.metadata.version(name)
-    edges = [
-        Path(os.environ.get("PROGRAMFILES(X86)", "C:/Program Files (x86)"))
-        / "Microsoft/Edge/Application/msedge.exe",
-        Path(os.environ.get("PROGRAMFILES", "C:/Program Files"))
-        / "Microsoft/Edge/Application/msedge.exe",
-        Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft/Edge/Application/msedge.exe",
-    ]
-    results["edge_found"] = any(p.is_file() for p in edges) or bool(shutil.which("msedge"))
+    results["edge_found"] = _installed_edge() is not None or bool(shutil.which("msedge"))
     if not args.offline:
         session = browser_provider(args.home, config)
         try:
@@ -315,12 +314,79 @@ async def _doctor(args, config):
     )
 
 
-def _connect(home: Path):
+def _installed_edge() -> Path | None:
+    roots = (
+        os.environ.get("PROGRAMFILES(X86)", "C:/Program Files (x86)"),
+        os.environ.get("PROGRAMFILES", "C:/Program Files"),
+        os.environ.get("LOCALAPPDATA", ""),
+    )
+    paths = (Path(root) / "Microsoft/Edge/Application/msedge.exe" for root in roots)
+    return next((path for path in paths if path.is_absolute() and path.is_file()), None)
+
+
+def _registered_edge() -> Path | None:
+    # Use Windows' application registration for launch. The project and PATH
+    # cannot provide a replacement executable.
+    import winreg
+
+    key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"
+    for registry in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+        try:
+            with winreg.OpenKey(registry, key) as entry:
+                value, _ = winreg.QueryValueEx(entry, "")
+            if isinstance(value, str):
+                path = Path(value)
+                if path.is_absolute() and path.is_file():
+                    return path
+        except OSError:
+            continue
+    return None
+
+
+def _open_edge_setup(folder: Path):
+    if sys.platform != "win32":
+        ui.event("Open edge://extensions and use the folder printed above.")
+        return
+    try:
+        subprocess.run(
+            [windows_binary("clip.exe")],
+            input=str(folder).encode("utf-16"),
+            capture_output=True,
+            check=True,
+            timeout=5,
+        )
+        ui.event(
+            "Folder copied. In the Load unpacked dialog, press Ctrl+L, Ctrl+V and Enter. "
+            "Then click Select Folder."
+        )
+    except (OSError, subprocess.SubprocessError):
+        ui.event("Clipboard unavailable. Paste the folder printed above into Load unpacked.")
+
+    edge = _registered_edge()
+    if edge is None:
+        ui.event("Open your Edge profile yourself and go to edge://extensions.")
+        return
+    try:
+        subprocess.Popen(
+            [str(edge), "edge://extensions/"],
+            cwd=edge.parent,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.DETACHED_PROCESS,
+        )
+    except OSError:
+        ui.event("Edge could not open from here. Go to edge://extensions in your intended profile.")
+
+
+def _connect(home: Path, *, open_edge: bool = False):
     try:
         with FileLock(home / "browser.lock", timeout=0):
             _prepare_connection(home)
     except Timeout as exc:
         raise RuntimeError("Stop the active PilotPatch task before preparing Edge setup.") from exc
+    if open_edge:
+        _open_edge_setup(home / "edge-extension")
 
 
 def _prepare_connection(home: Path):
@@ -363,6 +429,8 @@ async def dispatch(args) -> int:
     if command is None:
         parser().print_help()
         return 0
+    if args.open_edge and command != "connect":
+        raise ValueError("--open-edge is available with connect")
     args.home = args.home.expanduser().resolve()
     # State must not be placed inside a repository which the agent can read/share.
     project = args.project.expanduser().resolve()
@@ -394,7 +462,7 @@ async def dispatch(args) -> int:
         _logout(args.home, config)
         return 0
     if command == "connect":
-        _connect(args.home)
+        _connect(args.home, open_edge=args.open_edge)
         return 0
     if command == "doctor":
         return await _doctor(args, config)

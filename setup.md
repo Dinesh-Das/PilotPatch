@@ -16,19 +16,20 @@ $TargetProject = 'C:\Work\YourProject'
 $PilotPatchPython = Join-Path $PilotPatchRoot '.venv\Scripts\python.exe'
 $PilotPatchCli = Join-Path $PilotPatchRoot 'copilot.cmd'
 $PilotPatchState = Join-Path $env:LOCALAPPDATA 'PilotPatch'
-$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.2.3.vsix'
+$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.2.4.vsix'
 ```
 
 ## 2. Install the Python backend
 
 ```powershell
-.\setup-windows.ps1 -InstallEditor
+.\setup-windows.ps1 -InstallEditor -OpenEdgeSetup
 ```
 
 This installs and checks the local Python environment, prepares the Edge files, and
 registers the backend with PilotPatch in VS Code. With `-InstallEditor`, setup builds
 the matching VSIX if needed and installs it. Use `-Python 'C:\Approved Python\python.exe'`
 if the script cannot find the approved interpreter. Setup reuses a working environment.
+With `-OpenEdgeSetup`, setup opens Edge Extensions and copies the unpacked folder path.
 If the environment was copied from another laptop, move it aside and rerun setup.
 
 For manual installation under workplace script restrictions:
@@ -46,7 +47,7 @@ online pip steps:
 ```powershell
 $PilotPatchWheels = Join-Path $PilotPatchRoot 'wheelhouse'
 & $PilotPatchPython -I -m pip install --no-index --find-links $PilotPatchWheels --only-binary=:all: -r (Join-Path $PilotPatchRoot 'requirements.txt')
-& $PilotPatchPython -I -m pip install --no-index --no-deps (Join-Path $PilotPatchRoot 'dist\pilotpatch-0.2.3-py3-none-any.whl')
+& $PilotPatchPython -I -m pip install --no-index --no-deps (Join-Path $PilotPatchRoot 'dist\pilotpatch-0.2.4-py3-none-any.whl')
 ```
 
 If you installed manually, use **Extensions → … → Install from VSIX…** in VS Code
@@ -55,17 +56,18 @@ if needed.
 
 ## 3. Connect your current Edge profile
 
-Use the `edge-extension` folder and pairing file printed by Windows setup. With a
-manually installed backend, click **PilotPatch → Set up Copilot** in VS Code or run:
+Click **PilotPatch → Open Edge setup** in VS Code. It opens Edge Extensions and
+copies the folder path. You can also run:
 
 ```powershell
-& $PilotPatchCli --project $TargetProject connect
+& $PilotPatchCli --project $TargetProject connect --open-edge
 ```
 
 1. In the Edge profile you want to use, open `edge://extensions`. Enable **Developer
-   mode** and click **Load unpacked**. Paste the full path to the `edge-extension`
-   folder. Check that `manifest.json` is directly inside that folder. If PilotPatch
-   is already installed from it, click **Reload** on its card.
+   mode** and click **Load unpacked**. In the folder picker, press **Ctrl+L**,
+   **Ctrl+V**, and **Enter**, then click **Select Folder**. Use the printed
+   `edge-extension` path if the clipboard is unavailable. If PilotPatch is already
+   installed from this folder, click **Reload** on its card.
 2. Open **PilotPatch** from Edge's Extensions menu and choose the pairing file if
    asked. Open Copilot in that Edge profile and sign in. Click **Use this tab** in
    the PilotPatch popup. Choose the intended tab when more than one is open.
@@ -265,7 +267,7 @@ sign-out remains a manual action in Copilot/Edge.
 
 Stop your PilotPatch tasks. Get the updated source or extract the new office bundle,
 then rerun `.\setup-windows.ps1 -InstallEditor`. Reload VS Code if prompted. In the
-PilotPatch panel click **Set up Copilot** or **Set up or repair Edge**. In
+PilotPatch panel click **Open Edge setup** or **Show Edge setup paths**. In
 `edge://extensions`, reload the PilotPatch card. Return to the Edge popup, click
 **Use this tab** and rerun **Test connection** in VS Code.
 

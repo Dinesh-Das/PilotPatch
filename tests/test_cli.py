@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -119,14 +119,18 @@ def test_connect_packages_assets_and_logout_preserves_profile(tmp_path, monkeypa
 
     messages = []
     monkeypatch.setattr(cli.ui.console, "print", lambda message, **_: messages.append(message))
+    open_setup = Mock()
+    monkeypatch.setattr(cli, "_open_edge_setup", open_setup)
     cli._connect(tmp_path)
+    open_setup.assert_not_called()
     token = pairing(tmp_path)["token"]
     assert (tmp_path / "edge-extension" / "manifest.json").is_file()
     assert str(tmp_path / "edge-extension") in messages[0]
     assert "Load unpacked" in messages[0]
     assert "manifest.json" in messages[0]
     assert not any(token in message for message in messages)
-    cli._connect(tmp_path)
+    cli._connect(tmp_path, open_edge=True)
+    open_setup.assert_called_once_with(tmp_path / "edge-extension")
     assert pairing(tmp_path)["token"] == token
     profile = tmp_path / "edge-profile"
     profile.mkdir()
@@ -134,6 +138,24 @@ def test_connect_packages_assets_and_logout_preserves_profile(tmp_path, monkeypa
     cli._logout(tmp_path, Config())
     assert (profile / "keep.txt").read_text() == "do not touch"
     assert not (tmp_path / "edge-pairing.json").exists()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows Edge and clipboard commands")
+def test_guided_edge_setup_opens_fixed_page_and_copies_only_folder(tmp_path, monkeypatch):
+    from pilotpatch import cli
+
+    edge = tmp_path / "Browser with spaces" / "msedge.exe"
+    folder = tmp_path / "Édge files"
+    copy = Mock()
+    start = Mock()
+    monkeypatch.setattr(cli, "_registered_edge", lambda: edge)
+    monkeypatch.setattr(cli.subprocess, "run", copy)
+    monkeypatch.setattr(cli.subprocess, "Popen", start)
+    cli._open_edge_setup(folder)
+    assert copy.call_args.args == ([cli.windows_binary("clip.exe")],)
+    assert copy.call_args.kwargs["input"].decode("utf-16") == str(folder)
+    assert start.call_args.args == ([str(edge), "edge://extensions/"],)
+    assert start.call_args.kwargs["cwd"] == edge.parent
 
 
 @pytest.mark.parametrize(

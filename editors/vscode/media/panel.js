@@ -33,10 +33,11 @@
     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') submit(event);
   });
   for (const input of [prompt, mode, dryRun]) input.addEventListener('input', renderDraft);
-  for (const id of ['connect', 'login', 'probe', 'doctor', 'workspace', 'open-folder',
+  for (const id of ['login', 'probe', 'doctor', 'workspace', 'open-folder',
     'stop', 'configure', 'copy-extension', 'copy-pairing']) {
     element(id).addEventListener('click', () => send(id));
   }
+  element('connect').addEventListener('click', () => send('edge-setup'));
   element('repair').addEventListener('click', () => send('connect'));
   element('retest').addEventListener('click', () => send('probe'));
   element('settings').addEventListener('click', () => send('configure'));

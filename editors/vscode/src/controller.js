@@ -141,6 +141,7 @@ class Controller {
     if (api.env.remoteName) throw new Error('Use a local editor window. Remote/WSL hosts are not supported by this Windows Edge backend.');
     const starting = {
       connect: 'Preparing your Edge extension files…',
+      'edge-setup': 'Preparing the extension folder and opening Edge setup…',
       probe: 'Waiting for Edge. The test sends a short message with no project files.',
       doctor: 'Checking this laptop, project and Edge connection…',
     };
@@ -155,7 +156,8 @@ class Controller {
         throw new Error('Backend Python is not a file. Rerun Windows setup or select installed Python.');
       }
       const id = crypto.randomUUID();
-      const label = request.type === 'run' ? 'Task' : request.type[0].toUpperCase() + request.type.slice(1);
+      const label = request.type === 'run' ? 'Task' :
+        request.type === 'edge-setup' ? 'Edge setup' : request.type[0].toUpperCase() + request.type.slice(1);
       const execution = new api.ProcessExecution(invocation.executable, invocation.args,
         {cwd: invocation.cwd, env: {PYTHONUTF8: '1'}});
       const task = new api.Task({type: 'pilotpatch', runId: id}, folder,
@@ -185,12 +187,14 @@ class Controller {
     const phase = stopped ? 'stopped' : succeeded ? 'finished' : 'error';
     const success = {
       connect: 'Edge setup files are ready. Follow the steps in this panel.',
+      'edge-setup': 'Next, click Load unpacked in Edge and paste the extension folder path.',
       login: 'Microsoft sign-in detected. Test the connection to verify a reply.',
       probe: 'Copilot replied. Enter a task below.',
       doctor: 'Laptop, project and Copilot chat checks passed. Test connection to verify a reply.',
     };
     const failure = {
       connect: 'Edge setup could not prepare its files. See the terminal for the failed step.',
+      'edge-setup': 'Edge setup could not prepare its files. See the terminal for the failed step.',
       probe: 'Copilot connection check failed. Open PilotPatch in Edge, choose the intended tab and check the terminal.',
       doctor: 'A setup check failed. See the terminal for the result and next step.',
     };
@@ -198,7 +202,7 @@ class Controller {
       succeeded ? (success[type] || 'Finished. See the terminal for results and any checks.') :
         failure[type] ||
         `Process ended${Number.isInteger(event.exitCode) ? ` with exit ${event.exitCode}` : ''}. Check the terminal for details.`;
-    if (type === 'connect' && succeeded) {
+    if (['connect', 'edge-setup'].includes(type) && succeeded) {
       this.state.prepared = true;
       this.state.verified = false;
     }

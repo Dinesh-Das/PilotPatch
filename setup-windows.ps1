@@ -29,17 +29,21 @@ Installs the development tools into the same .venv\.
 .PARAMETER InstallEditor
 Installs the PilotPatch VSIX using the local VS Code command-line tool.
 
+.PARAMETER OpenEdgeSetup
+Opens the Edge extensions page and copies the unpacked extension folder path.
+
 .EXAMPLE
 .\setup-windows.ps1
 
 .EXAMPLE
-.\setup-windows.ps1 -InstallEditor
+.\setup-windows.ps1 -InstallEditor -OpenEdgeSetup
 #>
 [CmdletBinding()]
 param(
     [string]$Python,
     [switch]$Dev,
-    [switch]$InstallEditor
+    [switch]$InstallEditor,
+    [switch]$OpenEdgeSetup
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = $PSScriptRoot
@@ -107,7 +111,6 @@ if ($index.Count) {
 }
 Invoke-Checked $venvPython @('-I', '-m', 'pip', 'check')
 Invoke-Checked $venvPython @('-I', '-m', 'pilotpatch', '--project', $projectRoot, 'register-editor')
-Invoke-Checked $venvPython @('-I', '-m', 'pilotpatch', '--project', $projectRoot, 'connect')
 if ($InstallEditor) {
     $editor = Get-Command code.cmd -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $editor) {
@@ -119,8 +122,10 @@ if ($InstallEditor) {
     }
     Invoke-Checked $editor.Source @('--install-extension', $vsix)
     Write-Host "Installed the VS Code extension from $vsix"
-    Write-Host 'After selecting the tab in Edge, open your project in VS Code and click PilotPatch, then Test connection.'
 }
+$connectArgs = @('-I', '-m', 'pilotpatch', '--project', $projectRoot, 'connect')
+if ($OpenEdgeSetup) { $connectArgs += '--open-edge' }
+Invoke-Checked $venvPython $connectArgs
 $edgeCandidates = @(
     (Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'),
     (Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe'),
@@ -131,7 +136,9 @@ if (-not ($edgeCandidates | Where-Object { Test-Path -LiteralPath $_ })) {
 }
 Write-Host "PilotPatch $version installed into $venvRoot"
 Write-Host "Backend Python is $venvPython"
-if (-not $InstallEditor) {
+if ($InstallEditor) {
+    Write-Host 'After selecting the tab in Edge, open your project in VS Code and click PilotPatch, then Test connection.'
+} else {
     Write-Host 'For VS Code, rerun setup with -InstallEditor.'
     Write-Host "After selecting the tab in Edge, run & '$projectRoot\copilot.cmd' probe"
 }

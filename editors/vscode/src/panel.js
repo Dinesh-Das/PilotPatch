@@ -34,10 +34,10 @@ function renderPanel(webview, extensionUri, Uri) {
   </section>
   <section id="connection" class="setup" aria-labelledby="setup-title" hidden>
     <h2 id="setup-title">Connect Copilot in Edge</h2>
-    <p id="connect-intro">Set up your Edge profile once. If you already paired it, run the connection test.</p>
-    <button id="connect" class="primary">Set up Copilot</button>
+    <p id="connect-intro">Open Edge Extensions and copy the folder you’ll select there. Already paired? Test your connection.</p>
+    <button id="connect" class="primary">Open Edge setup</button>
     <ol class="setup-steps" id="edge-steps" hidden>
-      <li>In the Edge profile you want to use, open <code>edge://extensions</code>. Turn on <strong>Developer mode</strong> and choose <strong>Load unpacked</strong>. Paste the folder path. For an existing PilotPatch install, click <strong>Reload</strong> on its card instead.
+      <li>In your intended Edge profile, turn on <strong>Developer mode</strong> at <code>edge://extensions</code> and click <strong>Load unpacked</strong>. In the folder dialog, press <kbd>Ctrl+L</kbd>, paste the path, and press Enter. Click <strong>Select Folder</strong>. For an existing PilotPatch install, click <strong>Reload</strong> on its card.
         <button id="copy-extension" class="secondary">Copy extension folder path</button></li>
       <li>Open <strong>PilotPatch</strong> from Edge’s Extensions menu. If it asks for a pairing file, paste the file path in the picker. Open Copilot, sign in, and click <strong>Use this tab</strong> in PilotPatch.
         <button id="copy-pairing" class="secondary">Copy pairing file path</button></li>
@@ -67,7 +67,7 @@ function renderPanel(webview, extensionUri, Uri) {
   <section id="activity-section" class="activity" hidden><h2>Recent activity</h2><ol id="activity"></ol></section>
 </main>
 <footer id="tools" hidden><details><summary>Troubleshooting</summary><div class="tools">
-  <button id="repair" class="text-button">Set up or repair Edge</button>
+  <button id="repair" class="text-button">Show Edge setup paths</button>
   <button id="retest" class="text-button" hidden>Test Copilot connection</button>
   <button id="login" class="text-button">Check Microsoft sign-in</button>
   <button id="doctor" class="text-button">Check this laptop</button>

@@ -39,3 +39,9 @@ test('diagnostics are fixed commands without model/source-sharing flags', () => 
     assert.ok(!invocation.args.includes('--share-code'));
   }
 });
+
+test('guided setup uses only the fixed connect command and Windows handoff flag', () => {
+  const request = parseRequest({type: 'edge-setup'});
+  const invocation = buildInvocation('C:\\Python\\python.exe', 'C:\\repo', request);
+  assert.deepEqual(invocation.args.slice(-2), ['connect', '--open-edge']);
+});
