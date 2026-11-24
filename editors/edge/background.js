@@ -1,6 +1,7 @@
 /* Only this trusted extension context holds the pairing token. No page-origin relay. */
 "use strict";
 importScripts("connection.js");
+const driverVersion = 3;
 let running = false;
 let wakeRequested = false;
 let popupAction = Promise.resolve();
@@ -46,7 +47,7 @@ async function operate(tabId, command, selected, authorizeCommit) {
   const documentId = injected.find(frame => frame.frameId === 0)?.documentId;
   if (!documentId) throw new Error("selected_document_missing");
   const send = phase => chrome.tabs.sendMessage(tabId,
-    {type: "pilotpatch-command-v2", command, phase}, {documentId});
+    {type: `pilotpatch-command-v${driverVersion}`, command, phase}, {documentId});
   await selected(); // Injection itself can outlive revocation; do not even prepare afterward.
   let result = await send(command.action === "submit" ? "prepare" : "read");
   if (command.action === "submit" && !result?.failure) {
@@ -75,10 +76,10 @@ async function pump() {
     );
     if (!pair || !client || client !== selectedClient || !selection || !Number.isInteger(tabId)) return;
     if (!await chrome.tabs.get(tabId).catch(() => null)) return;
-    const identity = {client: `${client}:${selection}`, tab: tabId, protocol: 2};
+    const identity = {client: `${client}:${selection}`, tab: tabId, protocol: 2, driver: driverVersion};
     const auth = {key: await PilotPatchConnection.key(pair.token)};
     const hello = await post(pair, auth, "/hello", {});
-    if (hello.protocol !== 2) throw new Error("backend_upgrade_required");
+    if (hello.protocol !== 2 || hello.driver !== driverVersion) throw new Error("backend_upgrade_required");
     auth.session = hello.session;
     if (!/^[a-f0-9]{64}$/.test(auth.session)) throw new Error("invalid_session");
     auth.encryptionKey = await PilotPatchConnection.encryptionKey(auth.key, auth.session);
@@ -115,6 +116,7 @@ async function pump() {
         })};
       } catch (error) {
         const codes = new Set(["composer_has_draft", "send_control_not_unique", "send_disabled",
+          "unsent_draft_cleared",
           "turn_lost", "not_ready", "selected_tab_left_copilot", "selected_tab_closed"]);
         result = {error: codes.has(error.message) ? error.message : "selected_tab_action_failed"};
       }

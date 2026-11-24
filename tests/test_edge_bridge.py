@@ -6,7 +6,7 @@ import secrets
 
 import pytest
 
-from pilotpatch.browser.bridge import Bridge, pairing
+from pilotpatch.browser.bridge import DRIVER_VERSION, Bridge, pairing
 from pilotpatch.config import Config
 from pilotpatch.providers.base import ProviderError
 from pilotpatch.providers.existing_edge import CopilotExistingEdge
@@ -24,6 +24,7 @@ async def request(
     reader, writer = await asyncio.open_connection("127.0.0.1", bridge.port)
     value = dict(body or {"client": "test-client", "tab": 7})
     value.setdefault("protocol", 2)
+    value.setdefault("driver", DRIVER_VERSION)
     payload = json.dumps(value).encode()
     nonce = nonce or secrets.token_hex(32)
     if path != "/hello":
@@ -83,7 +84,11 @@ async def test_challenge_proof_and_requests_cannot_replay_across_server_sessions
     await bridge.open()
     try:
         code, hello = await request(bridge, path="/hello")
-        assert code == 200 and hello == {"session": bridge.session, "protocol": 2}
+        assert code == 200 and hello == {
+            "session": bridge.session,
+            "protocol": 2,
+            "driver": DRIVER_VERSION,
+        }
         assert bridge.token not in json.dumps(hello)
         nonce = secrets.token_hex(32)
         assert (await request(bridge, nonce=nonce))[0] == 200
@@ -137,16 +142,15 @@ async def test_submit_commit_grant_requires_live_pending_command_and_is_one_shot
         await bridge.close()
 
 
-async def test_legacy_worker_never_receives_the_submit_payload(tmp_path):
+@pytest.mark.parametrize("legacy", [{"protocol": None}, {"driver": None}, {"driver": 2}])
+async def test_legacy_worker_never_receives_the_submit_payload(tmp_path, legacy):
     bridge = Bridge(tmp_path, port=0)
     await bridge.open()
     try:
         call = asyncio.create_task(
             bridge.call("submit", {"text": "private prompt"}, wait_seconds=0.05)
         )
-        code, body = await request(
-            bridge, body={"client": "old-client", "tab": 7, "protocol": None}
-        )
+        code, body = await request(bridge, body={"client": "old-client", "tab": 7, **legacy})
         assert code == 409 and body == {"error": "extension_upgrade_required"}
         assert "private prompt" not in json.dumps(body)
         assert bridge.connection_error and "Reload" in bridge.connection_error

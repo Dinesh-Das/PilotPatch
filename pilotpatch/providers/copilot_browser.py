@@ -179,7 +179,15 @@ class CopilotBrowser:
             visible(e) && (users[0].compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING));
           if (answers.length !== 1) return {bound: false, ambiguous: answers.length > 1};
           const answer = answers[0];
-          const copy = answer.cloneNode(true);
+          const turn = users[0].closest('[data-testid="m365-chat-llm-web-ui-chat-message"]');
+          if (turn && !turn.contains(answer)) return {ambiguous: true};
+          const bodies = [...answer.querySelectorAll(s.assistant_body)].filter(visible);
+          if (bodies.length > 1) return {ambiguous: true};
+          if (!bodies.length &&
+              answer.matches('[role="article"][aria-labelledby^="copilot-message-"]')) {
+            return {bound: false};
+          }
+          const copy = (bodies[0] || answer).cloneNode(true);
           copy.querySelectorAll('button, svg, script, style, [aria-hidden="true"]')
             .forEach(e => e.remove());
           const blocks = copy.querySelectorAll('pre');

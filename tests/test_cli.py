@@ -112,6 +112,35 @@ async def test_status_returns_failure_when_signed_in_but_chat_has_error(tmp_path
     assert await cli._browser_command("status", SimpleNamespace(home=tmp_path), Config()) == 2
 
 
+@pytest.mark.parametrize(
+    "reply,matches",
+    [
+        ("PILOTPATCH_OK_fixture", True),
+        ("PILOTPATCH_OK_fixture.", True),
+        ("PILOTPATCH_OK_previous.", False),
+        ("PILOTPATCH_OK_fixture. Additional prose", False),
+    ],
+)
+async def test_probe_requires_the_current_nonce(tmp_path, monkeypatch, reply, matches):
+    import secrets
+
+    from pilotpatch import cli
+    from pilotpatch.config import Config
+
+    provider = SimpleNamespace(
+        open=AsyncMock(), close=AsyncMock(), send=AsyncMock(return_value=reply)
+    )
+    monkeypatch.setattr(cli, "browser_provider", lambda *_: provider)
+    monkeypatch.setattr(secrets, "token_hex", lambda _: "fixture")
+    args = SimpleNamespace(home=tmp_path)
+    if matches:
+        assert await cli._browser_command("probe", args, Config()) == 0
+    else:
+        with pytest.raises(RuntimeError, match="did not match the probe nonce"):
+            await cli._browser_command("probe", args, Config())
+    provider.send.assert_awaited_once()
+
+
 def test_connect_packages_assets_and_logout_preserves_profile(tmp_path, monkeypatch):
     from pilotpatch import cli
     from pilotpatch.browser.bridge import pairing

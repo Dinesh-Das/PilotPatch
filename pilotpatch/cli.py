@@ -208,10 +208,12 @@ async def _browser_command(command, args, config):
             from secrets import token_hex
 
             nonce = token_hex(8)
+            token = f"PILOTPATCH_OK_{nonce}"
             response = await provider.send(
-                f"Harmless connectivity test. Reply with exactly PILOTPATCH_OK_{nonce}."
+                f"Harmless connectivity test. Reply with this exact token and no other text:\n"
+                f"{token}"
             )
-            if response.strip() != f"PILOTPATCH_OK_{nonce}":
+            if response.strip() not in (token, token + "."):
                 raise RuntimeError("Received a live response but it did not match the probe nonce")
             ui.event(
                 "Live Copilot communication verified: submitted a nonce and retrieved "

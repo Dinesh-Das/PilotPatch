@@ -189,9 +189,9 @@ async def test_old_content_listener_cannot_receive_new_submit_commands(connected
     await worker.evaluate("""async () => {
       const {tabId}=await chrome.storage.session.get('tabId');
       await chrome.scripting.executeScript({target:{tabId},world:'ISOLATED',func:() => {
-        globalThis.__pilotpatchDriver=true;
+        globalThis.__pilotpatchDriver=2;
         chrome.runtime.onMessage.addListener(message => {
-          if (message.type === 'pilotpatch-command' && message.command.action === 'submit') {
+          if (message.type === 'pilotpatch-command-v2' && message.command.action === 'submit') {
             document.body.dataset.oldListenerSubmitted='true';
           }
           return false;

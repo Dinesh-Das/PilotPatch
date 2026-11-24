@@ -22,11 +22,20 @@ class Selectors(StrictModel):
         'button[aria-label="Send message" i], button[aria-label="Submit message" i], '
         'button[aria-label="Send" i]'
     )
-    assistant: str = '[data-content="ai-message"], [data-testid="assistant-message"]'
-    user: str = '[data-content="user-message"], [data-testid="user-message"]'
+    assistant: str = (
+        '[data-content="ai-message"], [data-testid="assistant-message"], '
+        '[data-testid="copilot-message-reply-div"] '
+        '[role="article"][aria-labelledby^="copilot-message-"]'
+        ':has([data-testid="chat-response-message"])'
+    )
+    assistant_body: str = '[data-testid="chat-response-message"]'
+    user: str = (
+        '[data-content="user-message"], [data-testid="user-message"], '
+        '[data-testid="chatQuestion"] [role="article"][aria-labelledby^="user-message-"]'
+    )
     stop: str = 'button[aria-label="Stop generating"], button[aria-label="Stop responding"]'
     # A code-block Copy button can appear during streaming; require a message control.
-    completion: str = 'button[aria-label="Copy message" i]'
+    completion: str = 'button[aria-label="Copy message" i], button[aria-label="Copy Response" i]'
     signed_in: str = (
         '[aria-label="Copilot navigation"] [role="button"][aria-label$=", Personal account" i], '
         'button[aria-label*="account" i], button[aria-label*="profile" i], '

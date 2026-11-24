@@ -22,6 +22,7 @@ from pilotpatch.providers.base import ProviderError
 from pilotpatch.security.storage import atomic_json, private_directory
 
 EXTENSION_ID = "jhmhehhjehmldcehodmlbopiajhcghki"
+DRIVER_VERSION = 3
 DEFAULT_PORT = 57423
 MAX_BODY = 12_000_000
 
@@ -129,7 +130,7 @@ class Bridge:
             self.pending = None
 
     def _dispatch(self, path, data):
-        if data.get("protocol") != 2:
+        if data.get("protocol") != 2 or data.get("driver") != DRIVER_VERSION:
             if path == "/next" and self.identity is None:
                 self.connection_error = (
                     "PilotPatch Edge extension needs an update. Run connect, then Reload "
@@ -184,10 +185,13 @@ class Bridge:
                 # Extension returns fixed error codes, never page text or credentials.
                 explanations = {
                     "composer_has_draft": "Selected Copilot tab has an unsent draft. "
-                    "Your draft was preserved; send it or clear it manually before retrying.",
+                    "Review it in Edge or open a new chat before retrying.",
                     "send_control_not_unique": "A unique Copilot Send button was not recognized. "
                     "Update selectors.send; no prompt was submitted.",
-                    "send_disabled": "Copilot's Send control was not ready. Inspect the draft.",
+                    "send_disabled": "The Copilot draft or Send control changed before sending. "
+                    "Review the draft in Edge.",
+                    "unsent_draft_cleared": "Copilot was not ready to send. PilotPatch cleared "
+                    "the unsent text it had prepared.",
                     "turn_lost": "The Copilot page changed during this turn; outcome is unknown.",
                     "not_ready": "Copilot is signed out, busy or unavailable. "
                     "Check the selected tab.",
@@ -255,7 +259,14 @@ class Bridge:
                             code, result = 403, {"error": "invalid_nonce"}
                         elif path == "/hello":
                             sign_response = True
-                            code, result = 200, {"session": self.session, "protocol": 2}
+                            code, result = (
+                                200,
+                                {
+                                    "session": self.session,
+                                    "protocol": 2,
+                                    "driver": DRIVER_VERSION,
+                                },
+                            )
                         else:
                             message = (f"request\n{self.session}\n{path}\n{nonce}\n").encode() + raw
                             expected = self.mac(message)

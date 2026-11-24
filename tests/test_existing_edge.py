@@ -35,6 +35,46 @@ function send() {
 }
 </script></body></html>"""
 
+MODERN_FIXTURE = r"""<!doctype html><html><body>
+<nav aria-label="Copilot navigation">
+  <div role="button" aria-label="Fixture User, Personal account">FU</div>
+</nav>
+<span id="m365-chat-editor-target-element" contenteditable="true" role="textbox"
+  aria-label="Message Copilot" style="display:block;white-space:pre-wrap">
+  &#8203;&#8204;
+</span>
+<button aria-label="Send" onclick="send()">Send</button>
+<script>
+const editor = document.querySelector('[role="textbox"]');
+editor.textContent = '\u200b\u200c';
+editor.addEventListener('input', () => {
+  const paragraph = document.createElement('p');
+  paragraph.textContent = editor.innerText + '\u200b\u200c';
+  editor.replaceChildren(paragraph);
+});
+window.sentCount = 0;
+function send() {
+  const text = editor.innerText.replace(/\u200b\u200c$/, '');
+  editor.textContent = '\u200b\u200c';
+  const count = ++window.sentCount;
+  const turn = document.createElement('div');
+  turn.dataset.testid = 'm365-chat-llm-web-ui-chat-message';
+  turn.innerHTML = '<div data-testid="chatQuestion"><div role="article" ' +
+    'aria-labelledby="user-message-fixture"><h5>You said:</h5><div class="draft"></div>' +
+    '</div></div><div data-testid="copilot-message-reply-div"><div role="article" ' +
+    'aria-labelledby="copilot-message-fixture"><h6>Copilot said:</h6>' +
+    '<div data-testid="chat-response-message">Partial reply</div></div></div>';
+  turn.querySelector('.draft').textContent = text;
+  document.body.append(turn);
+  setTimeout(() => {
+    turn.querySelector('[data-testid="chat-response-message"]').textContent =
+      'Complete modern reply ' + count + '.';
+    turn.querySelector('[aria-labelledby="copilot-message-fixture"]').insertAdjacentHTML(
+      'beforeend', '<div role="toolbar"><button aria-label="Copy Response">Copy</button></div>');
+  }, 180);
+}
+</script></body></html>"""
+
 
 @pytest.fixture
 async def connected_edge(tmp_path):
@@ -100,6 +140,39 @@ async def test_existing_tab_round_trip_and_multiple_turns(connected_edge):
     assert await provider.send("First fixture request") == "Complete fixture answer"
     assert await provider.send("Second fixture request") == "Complete fixture answer"
     assert await page.evaluate("window.sentCount") == 2
+
+
+@pytest.mark.browser
+async def test_modern_composer_and_reply_layout_round_trip(connected_edge):
+    provider, page, _ = connected_edge
+    await page.set_content(MODERN_FIXTURE)
+    first = await provider.send("First modern request\nWith another line")
+    assert first == "Complete modern reply 1."
+    assert await provider.send("Second modern request") == "Complete modern reply 2."
+    assert await page.evaluate("window.sentCount") == 2
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize("edited", [False, True])
+async def test_failed_send_preserves_any_text_pilotpatch_does_not_own(connected_edge, edited):
+    provider, page, _ = connected_edge
+    await page.set_content(MODERN_FIXTURE)
+    if edited:
+        await page.evaluate("""() => {
+          editor.addEventListener('input', () => {
+            editor.textContent = 'An edited draft';
+          }, {once: true});
+        }""")
+    else:
+        await page.get_by_role("button", name="Send", exact=True).evaluate(
+            "button => button.disabled = true"
+        )
+    expected_error = "Review the draft" if edited else "cleared"
+    with pytest.raises(ProviderError, match=expected_error):
+        await provider.send("Do not leave this draft behind")
+    draft = await page.get_by_role("textbox").inner_text()
+    assert draft == ("An edited draft" if edited else "\u200b\u200c")
+    assert await page.evaluate("window.sentCount") == 0
 
 
 @pytest.mark.browser

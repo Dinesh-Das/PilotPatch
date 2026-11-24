@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.5 — 2026-11-24
+
+- Support Copilot's current rich composer, message layout, and **Copy Response**
+  completion control.
+- Clear PilotPatch's exact unsent text when Send fails validation before the click.
+  Drafts edited by the user and turns with uncertain outcomes require manual review.
+- Accept the probe token followed by a single period. Upgrade the unpacked Edge
+  extension and reload it before starting a new task.
+
 ## 0.2.4 — 2026-11-24
 
 - Open Edge Extensions and copy the unpacked folder path in one action. Use

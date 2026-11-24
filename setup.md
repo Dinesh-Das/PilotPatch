@@ -16,7 +16,7 @@ $TargetProject = 'C:\Work\YourProject'
 $PilotPatchPython = Join-Path $PilotPatchRoot '.venv\Scripts\python.exe'
 $PilotPatchCli = Join-Path $PilotPatchRoot 'copilot.cmd'
 $PilotPatchState = Join-Path $env:LOCALAPPDATA 'PilotPatch'
-$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.2.4.vsix'
+$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.2.5.vsix'
 ```
 
 ## 2. Install the Python backend
@@ -47,7 +47,7 @@ online pip steps:
 ```powershell
 $PilotPatchWheels = Join-Path $PilotPatchRoot 'wheelhouse'
 & $PilotPatchPython -I -m pip install --no-index --find-links $PilotPatchWheels --only-binary=:all: -r (Join-Path $PilotPatchRoot 'requirements.txt')
-& $PilotPatchPython -I -m pip install --no-index --no-deps (Join-Path $PilotPatchRoot 'dist\pilotpatch-0.2.4-py3-none-any.whl')
+& $PilotPatchPython -I -m pip install --no-index --no-deps (Join-Path $PilotPatchRoot 'dist\pilotpatch-0.2.5-py3-none-any.whl')
 ```
 
 If you installed manually, use **Extensions → … → Install from VSIX…** in VS Code
@@ -323,6 +323,7 @@ tab without submitting a model prompt:
 | Copilot is signed in but account controls are unrecognized | Open Copilot's own account menu so its Sign out/account controls are visible, then retry `login` or `status`. |
 | `service_error` or the red request-failed banner | Inspect/refresh the Copilot tab manually, confirm normal chat works, then rerun `status` and `probe`. Re-pairing alone does not prove the service recovered. |
 | Unsent draft in the selected tab | Send or clear that draft yourself. PilotPatch preserves it instead of overwriting it. |
+| An earlier PilotPatch test is still in the message box | Open **New chat** on the selected Copilot tab before you try the new connection test. |
 | A turn was interrupted by navigation, reload or another user message | Inspect the tab and local history. Start a fresh chat and resume after reviewing unknown outcomes. |
 | Edge restarted | Click Use this tab again in the extension; pairing remains saved. |
 | Extension files were updated but behavior is unchanged | Run `connect`, reload the Edge extension, restart the old CLI task, then reselect the tab. |
