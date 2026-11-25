@@ -222,15 +222,26 @@ async def test_failed_send_preserves_any_text_pilotpatch_does_not_own(connected_
 
 
 @pytest.mark.browser
-async def test_personal_account_control_in_copilot_navigation(connected_edge):
+@pytest.mark.parametrize("collapsed", [False, True])
+async def test_personal_account_control_in_copilot_navigation(connected_edge, collapsed):
     provider, page, _ = connected_edge
-    await page.get_by_role("button", name="Account", exact=True).evaluate("""element => {
-      element.outerHTML = '<nav aria-label="Copilot navigation">' +
-        '<div role="button" aria-label="Fixture User, Personal account">FU</div></nav>';
-    }""")
+    profile = (
+        '<div data-testid="nav-footer-cta"><div>'
+        '<div role="button" tabindex="0" aria-label="Fixture User" '
+        'style="width:24px;height:24px"></div></div></div>'
+        if collapsed
+        else '<div role="button" aria-label="Fixture User, Personal account">FU</div>'
+    )
+    await page.get_by_role("button", name="Account", exact=True).evaluate(
+        """(element, profile) => {
+            element.outerHTML = '<nav aria-label="Copilot navigation">' + profile + '</nav>';
+        }""",
+        profile,
+    )
     status = await provider.status()
     assert status["authenticated"] and status["chat_ready"]
     assert status["account_control_count"] == 1
+    assert await provider.send("Test the signed-in profile") == "Complete fixture answer"
 
     await page.locator("nav").evaluate("element => element.removeAttribute('aria-label')")
     assert not (await provider.status())["authenticated"]
@@ -242,6 +253,9 @@ async def test_personal_account_control_in_copilot_navigation(connected_edge):
     status = await provider.status()
     assert status["state"] == "sign_in_required"
     assert not status["authenticated"]
+    with pytest.raises(ProviderError, match="No prompt was submitted"):
+        await provider.send("Guest must not receive this fixture message")
+    assert await page.evaluate("window.sentCount") == 1
 
 
 @pytest.mark.browser

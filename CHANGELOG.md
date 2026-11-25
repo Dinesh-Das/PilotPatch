@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 — 2026-11-25
+
+- Recognize the signed-in Copilot profile when its sidebar is collapsed. A visible
+  sign-in control still takes precedence.
+- Describe the connection test’s readiness check before it submits the probe.
+
 ## 0.4.0 — 2026-11-25
 
 - Select **Think Deeper** through the Copilot picker when offered. Use **Auto** when

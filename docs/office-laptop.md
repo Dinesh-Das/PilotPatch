@@ -7,7 +7,7 @@ and use of the intended Microsoft Copilot account for your project.
 
 ## Install it
 
-Transfer the `PilotPatch-Office-0.4.0.zip` produced by `build.cmd` through your
+Transfer the `PilotPatch-Office-0.4.1.zip` produced by `build.cmd` through your
 approved route. Extract it to a local folder you can write to, such as
 `%LOCALAPPDATA%\Programs\PilotPatch`. The bundle contains the Python dependency wheels,
 the VSIX and the source build files. Set up a fresh environment and pairing on each laptop.

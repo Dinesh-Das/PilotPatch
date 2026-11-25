@@ -43,6 +43,9 @@ class Selectors(StrictModel):
     completion: str = 'button[aria-label="Copy message" i], button[aria-label="Copy Response" i]'
     signed_in: str = (
         '[aria-label="Copilot navigation"] [role="button"][aria-label$=", Personal account" i], '
+        # The collapsed sidebar uses the account name alone on its focusable footer control.
+        '[aria-label="Copilot navigation"] [data-testid="nav-footer-cta"] '
+        'div[role="button"][tabindex][aria-label]:not([aria-label=""]), '
         'button[aria-label*="account" i], button[aria-label*="profile" i], '
         'button[title*="profile" i], [data-testid="user-avatar"], '
         '[data-testid="account-menu-button"], [data-testid="user-menu-button"], '
