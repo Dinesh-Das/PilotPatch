@@ -158,6 +158,21 @@ test('stopping terminates only the owned task and waits for its end event', asyn
   assert.equal(f.updates.at(-1).busy, false);
 });
 
+test('stopping chat preserves recorded changes and the interrupted file', async () => {
+  const f = fixture();
+  await f.controller.handle(chat);
+  const turn = f.chats[0];
+  turn.message({type: 'session', id: 'a'.repeat(32)});
+  await f.controller.handle({type: 'stop'});
+  assert.equal(turn.stopped, true);
+  turn.message({type: 'stopped', files_changed: ['answer.py'], uncertain_file: 'details.txt'});
+  turn.close(130);
+  const state = f.updates.at(-1);
+  assert.equal(state.phase, 'stopped');
+  assert.deepEqual(state.chat[0].files, ['answer.py']);
+  assert.equal(state.chat[0].uncertainFile, 'details.txt');
+});
+
 test('uses the registered backend and copies only paths for successful setup', async t => {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), 'pilotpatch-editor-'));
   t.after(() => fs.rm(home, {recursive: true, force: true}));

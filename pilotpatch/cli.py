@@ -236,6 +236,16 @@ async def _task(args, config, store, state, *, resume=False, output=ui, conversa
 async def _editor_chat(args, config, store) -> int:
     output = EditorConsole(dry_run=args.dry_run)
     state = None
+
+    def interruption(kind, message):
+        pending = state["pending"] if state else None
+        output.emit(
+            kind,
+            message=message,
+            files_changed=list(dict.fromkeys(state["changes"])) if state else [],
+            uncertain_file=pending.get("path") if pending else None,
+        )
+
     try:
         if args.arguments or args.share_code:
             raise ValueError("Editor messages and source approvals must come from the editor")
@@ -271,14 +281,14 @@ async def _editor_chat(args, config, store) -> int:
         output.emit("reply", result=result)
         return 0
     except asyncio.CancelledError:
-        output.emit("stopped", message="Stopped. Review the selected Edge chat and local changes.")
+        interruption("stopped", "Stopped. Review the selected Edge chat and local changes.")
         return 130
     except Exception as exc:
         # Validation errors can embed the full input including a user's draft.
         from pydantic import ValidationError
 
         message = "Invalid editor chat request" if isinstance(exc, ValidationError) else str(exc)
-        output.emit("error", message=message)
+        interruption("error", message)
         return 1
 
 

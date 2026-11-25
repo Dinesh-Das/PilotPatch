@@ -12,6 +12,7 @@ import hmac
 import json
 import re
 import secrets
+from contextlib import suppress
 from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
@@ -64,7 +65,7 @@ class Bridge:
         self.extension_id = EXTENSION_ID
         self.lock = FileLock(home / "browser.lock", timeout=0)
         self.server = None
-        self.handlers = set()
+        self.handlers: dict[asyncio.Task, asyncio.StreamWriter] = {}
         self.connected = asyncio.Event()
         self.identity = None
         self.connection_error = None
@@ -90,7 +91,7 @@ class Bridge:
             self.session = secrets.token_hex(32)
             self.nonces.clear()
             self.server = await asyncio.start_server(
-                self._handle,
+                self._accept,
                 "127.0.0.1",
                 data["port"] if self.port_override is None else self.port_override,
                 limit=16384,
@@ -101,19 +102,32 @@ class Bridge:
             raise
 
     async def close(self):
-        if self.server:
-            self.server.close()
-            await self.server.wait_closed()
-            self.server = None
-        for task in list(self.handlers):
-            task.cancel()
-        if self.handlers:
-            await asyncio.gather(*list(self.handlers), return_exceptions=True)
-        self.lock.release()
+        server, self.server = self.server, None
+        if server is None:
+            return
+        try:
+            server.close()
+            if self.pending and not self.pending["future"].done():
+                self.pending["future"].set_exception(
+                    ProviderError(
+                        "The Edge bridge closed. Check the selected Copilot tab. "
+                        "No automatic replay occurred."
+                    )
+                )
+            handlers = list(self.handlers.items())
+            for task, writer in handlers:
+                writer.transport.abort()
+                task.cancel()
+            await asyncio.gather(*(task for task, _ in handlers), return_exceptions=True)
+            await server.wait_closed()
+        finally:
+            self.lock.release()
 
     async def call(self, action: str, payload: dict, *, wait_seconds=15):
         if action not in {"status", "submit", "response"}:
             raise ValueError("Unsupported browser action")
+        if self.server is None:
+            raise ProviderError("The Edge bridge is closed.")
         if self.pending is not None:
             raise ProviderError("Concurrent browser actions are not supported")
         future = asyncio.get_running_loop().create_future()
@@ -214,12 +228,25 @@ class Bridge:
             return 200, {"ok": True}
         return 404, {"error": "unknown_route"}
 
-    async def _handle(self, reader, writer):
-        task = asyncio.current_task()
-        if len(self.handlers) >= 8:
-            writer.close()
+    def _accept(self, reader, writer):
+        if self.server is None or len(self.handlers) >= 8:
+            writer.transport.abort()
             return
-        self.handlers.add(task)
+        task = asyncio.create_task(self._handle(reader, writer))
+        self.handlers[task] = writer
+        task.add_done_callback(self.handlers.pop)
+
+    async def _handle(self, reader, writer):
+        try:
+            await self._serve(reader, writer)
+        except (OSError, TimeoutError):
+            pass
+        finally:
+            writer.close()
+            with suppress(OSError):
+                await writer.wait_closed()
+
+    async def _serve(self, reader, writer):
         code, result = 400, {"error": "invalid_request"}
         nonce, sign_response, encrypted = "", False, False
         try:
@@ -297,33 +324,23 @@ class Bridge:
             TimeoutError,
         ):
             pass
-        except asyncio.CancelledError:
-            writer.close()
-            raise
-        finally:
-            self.handlers.discard(task)
-        try:
-            body = json.dumps(result).encode()
-            if encrypted:
-                body = self.encrypt(body, f"response\n{self.session}\n{path}\n{nonce}")
-            proof = ""
-            if sign_response:
-                message = f"response\n{nonce}\n{code}\n".encode() + body
-                proof = f"X-PilotPatch-Mac: {self.mac(message)}\r\n"
-            writer.write(
-                (
-                    f"HTTP/1.1 {code} Response\r\nContent-Type: application/json\r\n"
-                    f"Content-Length: {len(body)}\r\nCache-Control: no-store\r\n"
-                    f"{proof}Connection: close\r\n\r\n"
-                ).encode()
-                + body
-            )
+        body = json.dumps(result).encode()
+        if encrypted:
+            body = self.encrypt(body, f"response\n{self.session}\n{path}\n{nonce}")
+        proof = ""
+        if sign_response:
+            message = f"response\n{nonce}\n{code}\n".encode() + body
+            proof = f"X-PilotPatch-Mac: {self.mac(message)}\r\n"
+        writer.write(
+            (
+                f"HTTP/1.1 {code} Response\r\nContent-Type: application/json\r\n"
+                f"Content-Length: {len(body)}\r\nCache-Control: no-store\r\n"
+                f"{proof}Connection: close\r\n\r\n"
+            ).encode()
+            + body
+        )
+        async with asyncio.timeout(4):
             await writer.drain()
-        except (ConnectionError, OSError):
-            pass
-        finally:
-            writer.close()
-            await writer.wait_closed()
 
     def mac(self, message: bytes) -> str:
         return hmac.new(bytes.fromhex(self.token), message, hashlib.sha256).hexdigest()

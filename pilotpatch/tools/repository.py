@@ -11,7 +11,7 @@ from pathspec import GitIgnoreSpec
 
 from pilotpatch.config import Config
 from pilotpatch.security.paths import EXCLUDED, PathGuard, SafetyError, sensitive
-from pilotpatch.security.redaction import redact
+from pilotpatch.security.redaction import redact, redact_private_key_line
 
 
 def sha256(data: bytes) -> str:
@@ -24,25 +24,26 @@ class Repository:
         self.root = self.guard.root
         self.config = config
 
-    def _ignore_specs(self, directory: Path):
+    def _ignore_specs(self, directory: Path, cache: dict[Path, GitIgnoreSpec | None]):
         specs = []
-        for parent in [self.root, *reversed(directory.relative_to(self.root).parents), directory]:
-            # Gather ancestors below root without interpreting a path outside it.
-            if not parent.is_absolute():
-                parent = self.root / parent
-            ignore = parent / ".gitignore"
-            if ignore.is_file() and not ignore.is_symlink() and ignore.stat().st_size < 64000:
+        ancestors = reversed(directory.relative_to(self.root).parents)
+        for parent in [*(self.root / ancestor for ancestor in ancestors), directory]:
+            if parent not in cache:
+                ignore = parent / ".gitignore"
+                cache[parent] = None
                 try:
-                    specs.append(
-                        (
-                            parent,
-                            GitIgnoreSpec.from_lines(
-                                ignore.read_text(encoding="utf-8").splitlines()
-                            ),
+                    if (
+                        not ignore.is_symlink()
+                        and ignore.is_file()
+                        and ignore.stat().st_size < 64000
+                    ):
+                        cache[parent] = GitIgnoreSpec.from_lines(
+                            ignore.read_text(encoding="utf-8").splitlines()
                         )
-                    )
-                except (OSError, UnicodeError):
-                    continue
+                except (OSError, ValueError):
+                    pass
+            if cache[parent] is not None:
+                specs.append((parent, cache[parent]))
         return specs
 
     def files(self, pattern: str = "*", limit: int = 2000) -> list[str]:
@@ -53,6 +54,7 @@ class Repository:
         visited = 0
         deadline = time.monotonic() + 10
         limited = False
+        ignore_cache: dict[Path, GitIgnoreSpec | None] = {}
 
         def unreadable(_):
             nonlocal limited
@@ -62,7 +64,7 @@ class Repository:
             if time.monotonic() > deadline:
                 return result, True
             base = Path(directory)
-            specs = self._ignore_specs(base)
+            specs = self._ignore_specs(base, ignore_cache)
 
             def allowed(name: str, is_dir: bool, base=base, specs=specs) -> bool:
                 path = base / name
@@ -73,10 +75,13 @@ class Repository:
                     self.guard.resolve(relative, directory=is_dir)
                 except SafetyError:
                     return False
-                return not any(
-                    spec.match_file(path.relative_to(parent).as_posix() + ("/" if is_dir else ""))
-                    for parent, spec in specs
-                )
+                for parent, spec in reversed(specs):
+                    decision = spec.check_file(
+                        path.relative_to(parent).as_posix() + ("/" if is_dir else "")
+                    ).include
+                    if decision is not None:
+                        return not decision
+                return True
 
             dirs[:] = sorted(d for d in dirs if allowed(d, True))
             for name in sorted(files):
@@ -84,9 +89,9 @@ class Repository:
                 if visited > 50000 or time.monotonic() > deadline:
                     return result, True
                 relative = (base / name).relative_to(self.root).as_posix()
-                if allowed(name, False) and (
+                if (
                     fnmatch.fnmatchcase(relative, pattern) or Path(relative).match(pattern)
-                ):
+                ) and allowed(name, False):
                     if len(result) >= limit:
                         return result, True
                     result.append(relative)
@@ -127,6 +132,8 @@ class Repository:
             raise ValueError("Request 1-based inclusive ranges of at most 501 lines")
         lines = []
         total_bytes = 0
+        range_bytes = 0
+        inside_key = False
         # Bounded scanning even if a file contains extremely long lines.
         with self.open_text_bytes(name) as stream:
             for number in range(1, min(end + 1, 100001)):
@@ -140,10 +147,12 @@ class Repository:
                     raise ValueError("Range exceeds scan/line limits")
                 if not line:
                     break
+                safe_line, inside_key = redact_private_key_line(line, inside_key)
                 if number >= start:
-                    lines.append(line.decode("utf-8-sig"))
-                if sum(len(s) for s in lines) > self.config.max_file_bytes:
-                    raise ValueError("Range too large; request fewer lines")
+                    range_bytes += len(line)
+                    if range_bytes > self.config.max_file_bytes:
+                        raise ValueError("Range too large; request fewer lines")
+                    lines.append(safe_line.decode("utf-8-sig"))
         return dict(
             path=name,
             start=start,
@@ -180,19 +189,32 @@ class Repository:
                         return dict(matches=matches, truncated=True)
         return dict(matches=matches, truncated=False)
 
-    def _git(self, arguments: list[str]) -> str:
+    def _git_bytes(self, arguments: list[str], *, input_data: bytes | None = None) -> bytes:
         executable = shutil.which("git")
         if not executable or Path(executable).resolve().is_relative_to(self.root):
             raise ValueError("Git must be installed outside the untrusted target repository")
         result = subprocess.run(
-            [executable, "--no-optional-locks", "-c", "core.fsmonitor=false", *arguments],
+            [
+                executable,
+                "--no-optional-locks",
+                "--no-replace-objects",
+                "-c",
+                "core.fsmonitor=false",
+                *arguments,
+            ],
             cwd=self.root,
             capture_output=True,
+            input=input_data,
             timeout=15,
         )
         if result.returncode:
             raise ValueError("Git operation failed; ensure the project is a Git repository")
-        return result.stdout[: self.config.max_file_bytes + 1].decode("utf-8", errors="replace")
+        return result.stdout
+
+    def _git(self, arguments: list[str]) -> str:
+        return self._git_bytes(arguments)[: self.config.max_file_bytes + 1].decode(
+            "utf-8", errors="replace"
+        )
 
     def git_status(self) -> dict:
         output = self._git(["status", "--porcelain=v1", "-unormal"])
@@ -203,32 +225,61 @@ class Repository:
         )
 
     def git_diff(self, name: str | None = None) -> dict:
-        names = [name] if name else self.files(limit=1000)
-        diffs = []
-        size = 0
-        for relative in names:
-            self.guard.resolve(relative)
-            try:
-                current = self.read(relative)["content"]
-                original = self._git(["show", f"HEAD:./{relative}"])
-                if len(original.encode("utf-8")) > self.config.max_file_bytes:
-                    continue
-            except (ValueError, OSError, UnicodeError):
+        if name:
+            names = [self.guard.resolve(name).relative_to(self.root).as_posix()]
+            truncated = False
+        else:
+            names, truncated = self.scan_files(limit=1000)
+        output = bytearray()
+        revisions = "".join(f"HEAD:./{relative}\n" for relative in names).encode()
+        try:
+            metadata = (
+                self._git_bytes(
+                    ["cat-file", "--batch-check", "--buffer"], input_data=revisions
+                ).splitlines()
+                if names
+                else []
+            )
+        except (ValueError, OSError, subprocess.TimeoutExpired):
+            metadata = []
+        for relative, entry in zip(names, metadata, strict=False):
+            fields = entry.split()
+            if len(fields) != 3 or fields[1] != b"blob" or not fields[2].isdigit():
                 continue
+            oid, _, size = fields
+            if len(oid) not in {40, 64} or any(c not in b"0123456789abcdef" for c in oid):
+                continue
+            if int(size) > self.config.max_file_bytes:
+                continue
+            try:
+                data = self.raw(relative)
+                algorithm = "sha1" if len(oid) == 40 else "sha256"
+                digest = hashlib.new(algorithm, usedforsecurity=False)
+                digest.update(f"blob {len(data)}\0".encode())
+                digest.update(data)
+                if digest.hexdigest().encode() == oid:
+                    continue
+                original = self.validate_text(self._git_bytes(["cat-file", "blob", oid.decode()]))
+            except (ValueError, OSError, subprocess.TimeoutExpired):
+                continue
+            # Redact both complete files before diffing so removed private key
+            # fragments cannot appear without their delimiters.
             diff = "".join(
                 difflib.unified_diff(
-                    original.splitlines(keepends=True),
-                    current.splitlines(keepends=True),
+                    redact(original.decode("utf-8-sig")).splitlines(keepends=True),
+                    redact(data.decode("utf-8-sig")).splitlines(keepends=True),
                     fromfile=f"a/{relative}",
                     tofile=f"b/{relative}",
                 )
             )
-            size += len(diff.encode())
-            diffs.append(redact(diff))
-            if size >= self.config.max_output_bytes:
+            safe = redact(diff).encode()
+            remaining = self.config.max_output_bytes - len(output)
+            output.extend(safe[:remaining])
+            if len(safe) > remaining:
+                truncated = True
                 break
         return dict(
-            output="".join(diffs)[: self.config.max_output_bytes],
-            truncated=size >= self.config.max_output_bytes,
+            output=output.decode("utf-8", errors="ignore"),
+            truncated=truncated,
             note="Filtered text diff against HEAD; untracked/deleted files use local session diff",
         )

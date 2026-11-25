@@ -214,12 +214,14 @@
         }
       }
       if (turn.error) add(row, 'p', turn.error, 'turn-error');
+      if (turn.uncertainFile) add(row, 'p', `Check ${turn.uncertainFile} on disk. Its write outcome is unknown.`, 'subtle');
       const reviewStatus = {preview: 'Preview only', discarded: 'Draft discarded',
         applied: 'Changes applied', partially_applied: 'Selected changes applied',
         no_draft: 'No changes drafted'}[turn.reviewStatus];
       if (reviewStatus) add(row, 'p', reviewStatus, 'review-status');
       if (turn.files?.length || turn.proposed?.length || turn.checks?.length || turn.notes?.length || turn.previews?.length || turn.dryRun) {
         const details = add(row, 'details', '');
+        if (turn.error && turn.files?.length) details.open = true;
         add(details, 'summary', turn.dryRun ? 'Preview and details' : 'Changes and details');
         for (const file of turn.files || []) add(details, 'p', `Changed ${file}`);
         if (turn.reviewStatus === 'preview' && !turn.reviewFiles) {

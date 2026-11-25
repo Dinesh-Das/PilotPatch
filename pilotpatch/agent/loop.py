@@ -86,9 +86,13 @@ class AgentLoop:
                     "it may have executed. Inspect current files; do not replay commands.",
                 ),
             )
-            state["receipts"][pending["id"]] = dict(
-                fingerprint=pending["fingerprint"], result=result
-            )
+            if pending["tool"] == "apply_review":
+                # An interrupted local approval has no Copilot tool-call fingerprint.
+                result["error"]["message"] += f" Check {pending['path']} on disk."
+            else:
+                state["receipts"][pending["id"]] = dict(
+                    fingerprint=pending["fingerprint"], result=result
+                )
             state["messages"].append(dict(role="tool", content=result))
             state["pending"] = None
             self.store.save(state)

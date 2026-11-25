@@ -66,12 +66,22 @@ def test_editor_registration_and_literal_prompt(tmp_path):
 
 @pytest.mark.parametrize(
     "decision",
-    ["decline-source", "decline-edit", "approve-edit", "preview", "stop", "stale", "select-files"],
+    [
+        "decline-source",
+        "decline-edit",
+        "approve-edit",
+        "preview",
+        "stop",
+        "stale",
+        "select-files",
+        "partial-error",
+    ],
 )
 async def test_editor_chat_pipe_only_applies_an_approved_edit(tmp_path, decision):
     # All I/O is real except the Copilot provider, which is replaced only in this test process.
     bootstrap = """
 import json
+import sys
 from pilotpatch import cli
 
 class FixtureCopilot:
@@ -97,6 +107,13 @@ class FixtureCopilot:
         return json.dumps(message)
 
 cli.browser_provider = lambda *_: FixtureCopilot()
+original_apply = cli.FileTools.apply_change
+decision = sys.argv.pop(1)
+def fixture_apply(self, change):
+    if decision == 'partial-error' and change.name == 'details.txt':
+        raise OSError('Interrupted during write')
+    return original_apply(self, change)
+cli.FileTools.apply_change = fixture_apply
 cli.main()
 """
     project = tmp_path / "project"
@@ -108,6 +125,7 @@ cli.main()
         "-I",
         "-c",
         bootstrap,
+        decision,
         "--home",
         str(home),
         "--project",
@@ -189,6 +207,11 @@ cli.main()
                 assert answer["result"]["files_changed"] == ["answer.py"]
                 assert answer["result"]["review_status"] == "partially_applied"
                 assert not (project / "details.txt").exists()
+            elif decision == "partial-error":
+                await send(dict(id=edit["id"], approved=True))
+                error = await read("error")
+                assert error["files_changed"] == ["answer.py"]
+                assert error["uncertain_file"] == "details.txt"
             else:
                 await send(dict(id=edit["id"], approved=decision == "approve-edit"))
                 answer = await read("reply")
@@ -197,10 +220,14 @@ cli.main()
                 assert answer["result"]["review_status"] == (
                     "applied" if decision == "approve-edit" else "discarded"
                 )
-        assert await asyncio.wait_for(child.wait(), timeout=10) == {"stop": 130, "stale": 1}.get(
-            decision, 0
+        assert await asyncio.wait_for(child.wait(), timeout=10) == {
+            "stop": 130,
+            "stale": 1,
+            "partial-error": 1,
+        }.get(decision, 0)
+        assert (project / "answer.py").exists() is (
+            decision in {"approve-edit", "select-files", "partial-error"}
         )
-        assert (project / "answer.py").exists() is (decision in {"approve-edit", "select-files"})
     finally:
         child.stdin.close()
         if child.returncode is None:

@@ -35,6 +35,93 @@ def test_explore_search_ignore_and_redaction(tmp_path):
     assert "secret-value" not in fs.repo.read("a.py")["content"]
 
 
+def test_inventory_honors_nested_negation_and_loads_each_ignore_file_once(tmp_path, monkeypatch):
+    from pathspec import GitIgnoreSpec
+
+    fs = tools(tmp_path)
+    root = fs.repo.root
+    (root / "nested").mkdir()
+    (root / "extra").mkdir()
+    (root / ".gitignore").write_text("*.dart\n")
+    (root / "nested/.gitignore").write_text("!keep.dart\n")
+    (root / "nested/keep.dart").write_text("keep")
+    (root / "nested/drop.dart").write_text("drop")
+    parsed = []
+    original = GitIgnoreSpec.from_lines
+
+    def read_rules(lines):
+        parsed.append(lines)
+        return original(lines)
+
+    monkeypatch.setattr(GitIgnoreSpec, "from_lines", read_rules)
+    assert fs.repo.files("*.dart") == ["nested/keep.dart"]
+    assert len(parsed) == 2
+
+
+def test_line_ranges_preserve_private_key_redaction_and_byte_limit(tmp_path):
+    fs = tools(tmp_path)
+    target = fs.repo.root / "fixture.py"
+    target.write_bytes(
+        b"before = 1\n-----BEGIN PRIVATE KEY-----\n"
+        b"example-private-key-body\n-----END PRIVATE KEY-----\nafter = 2\n"
+    )
+    assert "example-private-key-body" not in fs.repo.read_range("fixture.py", 3, 3)["content"]
+    assert "after = 2" in fs.repo.read_range("fixture.py", 3, 5)["content"]
+    fs.repo = Repository(fs.repo.root, Config(max_file_bytes=1024))
+    target.write_text(("é" * 280 + "\n") * 2, encoding="utf-8")
+    with pytest.raises(ValueError, match="Range too large"):
+        fs.repo.read_range("fixture.py", 1, 2)
+
+
+def test_repository_diff_fetches_only_changed_blobs(tmp_path, monkeypatch):
+    fs = tools(tmp_path)
+    root = fs.repo.root
+    for index in range(5):
+        (root / f"file {index}.py").write_bytes(b"value = 1\n")
+    key_text = (
+        b"-----BEGIN PRIVATE KEY-----\n"
+        + b"other-fixture-line\n" * 6
+        + b"original-fixture-body\n"
+        + b"other-fixture-line\n" * 6
+        + b"-----END PRIVATE KEY-----\n"
+    )
+    (root / "fixture.txt").write_bytes(key_text)
+    for args in (
+        ["init", "-q"],
+        ["config", "core.autocrlf", "false"],
+        ["add", "."],
+        [
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "fixture",
+        ],
+    ):
+        subprocess.run(["git", *args], cwd=root, check=True)
+    (root / "file 4.py").write_bytes(b"value = 2\n")
+    invoked = []
+    real_run = subprocess.run
+
+    def run(command, **kwargs):
+        invoked.append(command)
+        return real_run(command, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", run)
+    report = fs.repo.git_diff()
+    assert "+value = 2" in report["output"]
+    assert not report["truncated"]
+    assert len(invoked) == 2
+    (root / "fixture.txt").write_bytes(
+        key_text.replace(b"original-fixture-body", b"new-fixture-body")
+    )
+    assert fs.repo.git_diff("fixture.txt")["output"] == ""
+
+
 def test_replace_requires_exact_unique_content_and_backup(tmp_path):
     fs = tools(tmp_path)
     file = fs.repo.root / "a.py"

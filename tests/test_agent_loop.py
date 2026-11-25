@@ -96,6 +96,17 @@ async def test_format_correction_is_bounded(tmp_path):
     assert loop.state["status"] == "interrupted"
 
 
+async def test_resume_skips_an_interrupted_review_write_without_replaying_it(tmp_path):
+    loop = make_loop(tmp_path, [final()])
+    loop.state["pending"] = dict(id="apply_review", tool="apply_review", path="details.txt")
+    report = await loop.run(resume=True, resolve_pending=True)
+    assert report["files_changed"] == []
+    assert loop.state["pending"] is None
+    assert loop.state["receipts"] == {}
+    assert "Check details.txt on disk." in loop.provider.prompts[0]
+    assert not (tmp_path / "repo/details.txt").exists()
+
+
 async def test_editor_recovers_when_copilot_says_no_tools_for_ui_change(tmp_path):
     refusal = {**final(), "summary": "I can't access the repository tools."}
     loop = make_loop(

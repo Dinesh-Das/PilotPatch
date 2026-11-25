@@ -27,6 +27,21 @@ def test_escaped_unicode_truncation_stays_valid_and_bounded():
     assert json.loads(result)["truncated"] is True
 
 
+def test_resume_preserves_continuation_instructions_under_context_limit(tmp_path):
+    base = ContextBuilder(Repository(tmp_path, Config(max_context_bytes=12000)))
+    task = "Continue the task " + "x" * (
+        12000 - len(base.initial("Continue the task ").encode()) - 240
+    )
+    initial = base.initial(task)
+    assert len(initial.encode()) < 12000
+    paths = ["src/" + "x" * 350 + f"{i}.py" for i in range(9)]
+    state = dict(task=task, steps=5, changes=[*paths, "src/file.py"], checks=[], messages=[])
+    prompt = base.resume(state)
+    assert len(prompt.encode()) <= 12000
+    assert "Re-read current files before editing" in prompt
+    assert "src/file.py" in prompt
+
+
 def test_state_reload_and_audit(tmp_path):
     store = SessionStore(tmp_path)
     state = store.create(tmp_path / "project", "Task")

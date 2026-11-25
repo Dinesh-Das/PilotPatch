@@ -274,7 +274,7 @@ class Controller {
   }
 
   chatMessage(active, message) {
-    if (this.active !== active || active.stopping) return;
+    if (this.active !== active || (active.stopping && !['error', 'stopped'].includes(message.type))) return;
     if (message.type === 'approval' && typeof message.id === 'string') {
       active.approval = message;
       active.openDiffs.clear();
@@ -334,7 +334,9 @@ class Controller {
       'Stopped. Your message is still in the composer.') : outcome?.message ||
       (active.turn ? 'The backend closed before returning a reply. Review Edge and local changes.' :
         'PilotPatch could not start chat. Rerun setup to update the selected backend.');
-    if (active.turn) active.turn.error = message;
+    if (active.turn) Object.assign(active.turn, {
+      error: message, files: outcome?.files_changed, uncertainFile: outcome?.uncertain_file,
+    });
     this.update(stopped ? 'stopped' : declined ? 'idle' : 'error', message, false);
   }
 

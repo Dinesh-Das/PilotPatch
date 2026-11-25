@@ -18,6 +18,26 @@ def test_default_never_constructs_or_launches_managed_edge(tmp_path):
     assert isinstance(browser_provider(tmp_path, Config()), CopilotExistingEdge)
 
 
+async def test_shutdown_interrupts_a_pending_command_and_releases_the_browser_lock(tmp_path):
+    bridge = Bridge(tmp_path, port=0)
+    await bridge.open()
+    waiting = asyncio.create_task(bridge.call("status", {}, wait_seconds=15))
+    await asyncio.sleep(0)
+    reader, writer = await asyncio.open_connection("127.0.0.1", bridge.port)
+    try:
+        await asyncio.wait_for(bridge.close(), timeout=2)
+        with pytest.raises(ProviderError, match="closed"):
+            await asyncio.wait_for(asyncio.shield(waiting), timeout=0.5)
+        assert await asyncio.wait_for(reader.read(), timeout=1) == b""
+        assert not bridge.lock.is_locked
+    finally:
+        waiting.cancel()
+        await asyncio.gather(waiting, return_exceptions=True)
+        writer.close()
+        await writer.wait_closed()
+        await bridge.close()
+
+
 async def request(
     bridge, token=None, origin=None, path="/next", body=None, host=None, nonce=None, session=None
 ):

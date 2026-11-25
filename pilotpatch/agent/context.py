@@ -87,7 +87,12 @@ class ContextBuilder:
         self.review = review
 
     def initial(
-        self, task: str, conversation: list[dict] | None = None, *, reminder: str = ""
+        self,
+        task: str,
+        conversation: list[dict] | None = None,
+        *,
+        reminder: str = "",
+        reserve_bytes: int = 0,
     ) -> str:
         files = self.repo.files(limit=500)
         markers = {
@@ -151,7 +156,7 @@ class ContextBuilder:
             policy += REVIEW_POLICY
         if reminder:
             policy += reminder + "\n"
-        budget = self.repo.config.max_context_bytes - len(policy.encode()) - 100
+        budget = self.repo.config.max_context_bytes - len(policy.encode()) - 100 - reserve_bytes
         # Preserve the protocol and task; reduce repository context first.
         while len(json.dumps(envelope, ensure_ascii=False).encode()) > budget and selected:
             selected.pop()
@@ -179,22 +184,22 @@ class ContextBuilder:
         return prefix + bounded_json(result, budget) + suffix
 
     def resume(self, state: dict) -> str:
-        initial = self.initial(state["task"])
-        # Rebuild a fresh remote conversation rather than trusting a stale tab or a URL.
+        try:
+            initial = self.initial(state["task"], reserve_bytes=1500)
+        except ValueError:
+            initial = self.initial(state["task"])
+        prefix = "\nRe-read current files before editing. Unfinished actions may have run.\n"
+        remaining = self.repo.config.max_context_bytes - len((initial + prefix).encode())
         recent = state["messages"][-6:]
-        remaining = self.repo.config.max_context_bytes - len(initial.encode()) - 1000
-        while recent and len(json.dumps(recent).encode()) > remaining:
-            recent.pop(0)
-        return (
-            initial + "\nResuming interrupted task. Prior tool receipts are authoritative. "
-            "Re-read current files before editing. Do not assume unfinished tools succeeded.\n"
-            + bounded_json(
-                dict(
-                    steps=state["steps"],
-                    changes=state["changes"],
-                    checks=state["checks"],
-                    recent_untrusted=recent,
-                ),
-                max(500, remaining),
-            )
+        checks = state["checks"][-6:]
+        changes = state["changes"][-12:]
+        receipt = redact_value(
+            dict(steps=state["steps"], changes=changes, checks=checks, recent_untrusted=recent)
         )
+        for key in ("recent_untrusted", "checks", "changes"):
+            while (
+                len(json.dumps(receipt, ensure_ascii=False).encode()) > remaining and receipt[key]
+            ):
+                receipt[key].pop(0)
+        serialized = json.dumps(receipt, ensure_ascii=False)
+        return initial + prefix + (serialized if len(serialized.encode()) <= remaining else "")

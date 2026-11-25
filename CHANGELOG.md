@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.1 — 2026-11-25
+
+- Release the Edge connection promptly when a task stops with an open browser request.
+- Honor nested Git ignore rules, avoid repeated ignore-file parsing, and skip unchanged
+  Git blobs when generating repository diffs.
+- Preserve private key redaction in line ranges and Git diffs, and keep resumed
+  requests inside the configured context budget.
+- Show recorded file changes when an apply is interrupted and flag any write whose
+  outcome needs to be checked on disk.
+
 ## 0.5.0 — 2026-11-25
 
 - Review draft edits by file with line numbers and highlighted additions and removals.
