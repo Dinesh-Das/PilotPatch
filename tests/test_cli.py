@@ -65,7 +65,7 @@ def test_editor_registration_and_literal_prompt(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "decision", ["decline-source", "decline-edit", "approve-edit", "preview", "stop"]
+    "decision", ["decline-source", "decline-edit", "approve-edit", "preview", "stop", "stale"]
 )
 async def test_editor_chat_pipe_only_applies_an_approved_edit(tmp_path, decision):
     # All I/O is real except the Copilot provider, which is replaced only in this test process.
@@ -84,6 +84,12 @@ class FixtureCopilot:
         if text.startswith('You are Microsoft Copilot'):
             message = dict(type='tool_call', id='write1', tool='write_file',
                            arguments=dict(path='answer.py', content='answer = 42\\n'))
+        elif '"staged": true' in text and '"id": "write1"' in text:
+            message = dict(type='tool_call', id='write2', tool='replace_in_file',
+                           arguments=dict(path='answer.py', old_text='42', new_text='43'))
+        elif '"staged": true' in text and '"id": "write2"' in text:
+            message = dict(type='tool_call', id='write3', tool='write_file',
+                           arguments=dict(path='details.txt', content='Details\\n'))
         else:
             message = dict(type='final', summary='Here is what happened.', tests='',
                            files_changed=['answer.py'], remaining_issues=[])
@@ -133,7 +139,7 @@ cli.main()
             await read("declined")
             assert not list((home / "sessions").iterdir())
         elif decision == "preview":
-            assert "+answer = 42" in (await read("preview"))["diff"]
+            assert "+answer = 43" in (await read("preview"))["diff"]
             answer = await read("reply")
             assert answer["result"]["dry_run"] is True
             assert answer["result"]["files_changed"] == []
@@ -141,22 +147,34 @@ cli.main()
             session = await read("session")
             edit = await read("approval")
             assert edit["source"] is False
-            assert "+answer = 42" in edit["diff"]
+            assert edit["review"] is True
+            assert "+answer = 43" in edit["diff"]
+            assert "+answer = 42" not in edit["diff"]
             assert not (project / "answer.py").exists()
+            assert not (project / "details.txt").exists()
             # A duplicate source-sharing acknowledgement cannot approve a file edit.
             await send(dict(id=source["id"], approved=True))
             if decision == "stop":
                 child.stdin.close()
                 await read("stopped")
                 state = json.loads((home / "sessions" / session["id"] / "state.json").read_text())
-                assert state["pending"]["id"] == "write1"
+                assert state["pending"] is None
+            elif decision == "stale":
+                (project / "details.txt").write_text("User changes")
+                await send(dict(id=edit["id"], approved=True))
+                error = await read("error")
+                assert "changed during review" in error["message"]
+                assert (project / "details.txt").read_text() == "User changes"
             else:
                 await send(dict(id=edit["id"], approved=decision == "approve-edit"))
                 answer = await read("reply")
-                verified_files = ["answer.py"] if decision == "approve-edit" else []
+                verified_files = ["answer.py", "details.txt"] if decision == "approve-edit" else []
                 assert answer["result"]["files_changed"] == verified_files
-        assert await asyncio.wait_for(child.wait(), timeout=10) == (
-            130 if decision == "stop" else 0
+                assert answer["result"]["review_status"] == (
+                    "applied" if decision == "approve-edit" else "discarded"
+                )
+        assert await asyncio.wait_for(child.wait(), timeout=10) == {"stop": 130, "stale": 1}.get(
+            decision, 0
         )
         assert (project / "answer.py").exists() is (decision == "approve-edit")
     finally:

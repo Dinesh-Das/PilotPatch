@@ -96,6 +96,35 @@ async def test_format_correction_is_bounded(tmp_path):
     assert loop.state["status"] == "interrupted"
 
 
+async def test_editor_recovers_when_copilot_says_no_tools_for_ui_change(tmp_path):
+    refusal = {**final(), "summary": "I can't access the repository tools."}
+    loop = make_loop(
+        tmp_path,
+        [
+            "Please provide lab.css.",
+            refusal,
+            call("read-css", "read_file", path="web/lab.css"),
+            call(
+                "edit-css",
+                "replace_in_file",
+                path="web/lab.css",
+                old_text="color: red",
+                new_text="color: navy",
+            ),
+            final(),
+        ],
+    )
+    project = tmp_path / "repo"
+    (project / "web").mkdir()
+    (project / "web/lab.css").write_text("body { color: red; }")
+    loop.state["task"] = "Can you make changes to the codebase and polish the UI?"
+    report = await loop.run(conversation=[])
+    assert report["files_changed"] == ["web/lab.css"]
+    assert "body { color: red; }" in loop.provider.prompts[0]
+    assert "tool_call" in loop.provider.prompts[1]
+    assert "PilotPatch runs" in loop.provider.prompts[2]
+
+
 async def test_duplicate_id_with_different_payload_rejected(tmp_path):
     loop = make_loop(tmp_path, [call("a", "list_directory"), call("a", "git_status")])
     with pytest.raises(AgentStopped, match="different arguments"):

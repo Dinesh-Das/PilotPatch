@@ -144,6 +144,51 @@ async def test_existing_tab_round_trip_and_multiple_turns(connected_edge):
 
 
 @pytest.mark.browser
+@pytest.mark.parametrize("has_deeper", [True, False])
+async def test_existing_tab_uses_the_best_offered_reasoning_before_submit(
+    connected_edge, has_deeper
+):
+    provider, page, _ = connected_edge
+    await page.evaluate(
+        """hasDeeper => {
+      const button = document.createElement('button');
+      button.setAttribute('aria-haspopup', 'menu');
+      button.setAttribute('aria-label', 'Quick Response, Model Selector');
+      button.innerText = 'Quick Response';
+      document.body.prepend(button);
+      button.onclick = () => {
+        button.setAttribute('aria-expanded', 'true');
+        const menu = document.createElement('div'); menu.setAttribute('role', 'menu');
+        for (const name of hasDeeper ? ['Auto', 'Think Deeper'] : ['Auto']) {
+          const item = document.createElement('div');
+          item.setAttribute('role', 'menuitemradio');
+          item.innerText = name + '\\n' + 'Option help';
+          item.onclick = () => {
+            menu.remove();
+            const replacement = button.cloneNode(true);
+            replacement.removeAttribute('aria-expanded');
+            replacement.setAttribute('aria-label', name + ', Model Selector');
+            replacement.innerText = name;
+            button.replaceWith(replacement);
+          };
+          menu.append(item);
+        }
+        document.body.append(menu);
+      };
+      const original = window.send;
+      window.send = () => {
+        window.submittedWith = document.querySelector('[aria-haspopup="menu"]').innerText;
+        original();
+      };
+    }""",
+        has_deeper,
+    )
+    await provider.send("Fixture request")
+    assert provider.reasoning_mode == ("think_deeper" if has_deeper else "auto")
+    assert await page.evaluate("window.submittedWith") == ("Think Deeper" if has_deeper else "Auto")
+
+
+@pytest.mark.browser
 async def test_modern_composer_and_reply_layout_round_trip(connected_edge):
     provider, page, _ = connected_edge
     await page.set_content(MODERN_FIXTURE)

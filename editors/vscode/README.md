@@ -33,8 +33,10 @@ Read the full setup guide for troubleshooting, managed laptop checks and CLI usa
 
 ## Chat controls
 
-**Permissions and preview** changes how file edits and commands are approved. **Preview only**
-proposes changes without writing them or running tests. **Change project** appears
+**Review and apply** is the default under **Permissions and preview**. Copilot requests
+local reads and edits as it works. When the proposed diff is ready, use **Apply changes**
+or **Discard draft**. Run verification after applying the draft. **Preview only** shows
+the diff without applying it. **Change project** appears
 in multi-root workspaces. **Stop message** stops the active turn. Inspect Edge and
 your project before retrying an interrupted turn.
 

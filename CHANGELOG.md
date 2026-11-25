@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 — 2026-11-25
+
+- Select **Think Deeper** through the Copilot picker when offered. Use **Auto** when
+  it is the best recognized option and report the mode used in VS Code.
+- Gather relevant source automatically and continue with local tool requests when
+  an edit response ends without proposing changes.
+- Prepare a file draft in VS Code, keep subsequent reads in sync with it, and
+  show the combined diff for **Apply changes** or **Discard draft**.
+- Keep the chat composer visible while the conversation scrolls.
+
 ## 0.3.0 — 2026-11-24
 
 - Chat about a project in the VS Code sidebar. Copilot replies inline and recent

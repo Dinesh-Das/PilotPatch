@@ -22,7 +22,7 @@ from pilotpatch.providers.base import ProviderError
 from pilotpatch.security.storage import atomic_json, private_directory
 
 EXTENSION_ID = "jhmhehhjehmldcehodmlbopiajhcghki"
-DRIVER_VERSION = 3
+DRIVER_VERSION = 4
 DEFAULT_PORT = 57423
 MAX_BODY = 12_000_000
 

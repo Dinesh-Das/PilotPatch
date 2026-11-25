@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pilotpatch"
-version = "0.3.0"
+version = "0.4.0"
 description = "A local, Microsoft Copilot-only coding harness for Windows"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
@@ -44,6 +44,7 @@ packages = ["pilotpatch"]
 "editors/edge/connection.js" = "pilotpatch/edge_extension/connection.js"
 "editors/edge/content.js" = "pilotpatch/edge_extension/content.js"
 "editors/edge/manifest.json" = "pilotpatch/edge_extension/manifest.json"
+"editors/edge/mode.js" = "pilotpatch/edge_extension/mode.js"
 "editors/edge/popup.css" = "pilotpatch/edge_extension/popup.css"
 "editors/edge/popup.html" = "pilotpatch/edge_extension/popup.html"
 "editors/edge/popup.js" = "pilotpatch/edge_extension/popup.js"

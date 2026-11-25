@@ -20,7 +20,11 @@ From the PilotPatch folder in PowerShell:
 3. Open your project in VS Code, click **PilotPatch**, then **Test connection**.
    When Copilot replies, ask a question or request a change and click **Send**.
 4. Click **Share and send** if authorized. Read Copilot’s reply in the sidebar, then
-   ask a follow-up or approve a proposed edit there.
+   ask a follow-up or review the draft. **Apply changes** writes the reviewed draft.
+
+PilotPatch chooses **Think Deeper** when Copilot offers it and prefers **Auto** when
+it is unavailable. With **Review and apply** selected, PilotPatch gathers relevant
+source and prepares the combined file diff before asking for approval.
 
 Setup installs Python dependencies and the VSIX, prepares the Edge files, opens the
 Extensions page, and copies the folder path. To reopen setup later, click

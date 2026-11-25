@@ -1,5 +1,6 @@
+import json
 import subprocess
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import Field
 
@@ -15,6 +16,12 @@ class Empty(StrictModel):
 
 class PathArgs(StrictModel):
     path: str = Field(min_length=1, max_length=500)
+
+
+class PathsArgs(StrictModel):
+    paths: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(
+        min_length=1, max_length=6
+    )
 
 
 class ListArgs(StrictModel):
@@ -72,6 +79,7 @@ class TestArgs(StrictModel):
 ARGUMENTS = {
     "list_directory": ListArgs,
     "read_file": PathArgs,
+    "read_files": PathsArgs,
     "read_file_range": RangeArgs,
     "search_files": FindArgs,
     "search_content": SearchArgs,
@@ -94,20 +102,30 @@ def tool_schemas() -> dict:
 
 
 class ToolRegistry:
-    def __init__(self, files: FileTools, commands: CommandRunner):
+    def __init__(self, files: FileTools, commands: CommandRunner, *, preparing_edits=False):
         self.files = files
         self.commands = commands
+        self.preparing_edits = preparing_edits
 
     async def execute(self, action: ToolCall) -> dict[str, Any]:
         try:
             args = ARGUMENTS[action.tool].model_validate(action.arguments).model_dump()
             repo, fs = self.files.repo, self.files
             path = args.get("path")
+            if action.tool in {"run_command", "run_tests"} and (
+                self.preparing_edits or getattr(repo, "changes", None)
+            ):
+                raise PermissionError(
+                    "Commands cannot check proposed changes before they are applied. "
+                    "Finish the draft and list the verification command in your reply."
+                )
             match action.tool:
                 case "list_directory":
                     result = repo.listing(path)
                 case "read_file":
                     result = repo.read(path)
+                case "read_files":
+                    result = self.read_files(args["paths"])
                 case "read_file_range":
                     result = repo.read_range(path, args["start"], args["end"])
                 case "search_files":
@@ -159,3 +177,19 @@ class ToolRegistry:
                 success=False,
                 error=dict(code=type(exc).__name__, message=error[:1000]),
             )
+
+    def read_files(self, paths: list[str]) -> dict:
+        available = self.files.repo.config.max_context_bytes // 2
+        files = []
+        for path in dict.fromkeys(paths):
+            try:
+                data = self.files.repo.read(path)
+                size = len(json.dumps(data, ensure_ascii=False).encode())
+                if size > available:
+                    files.append(dict(path=path, note="Use read_file_range for this file"))
+                else:
+                    available -= size
+                    files.append(data)
+            except (ValueError, OSError, UnicodeError) as exc:
+                files.append(dict(path=path[:500], error=redact(str(exc))[:500]))
+        return dict(files=files)

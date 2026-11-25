@@ -16,7 +16,7 @@ function renderPanel(webview, extensionUri, Uri) {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${source}; script-src 'nonce-${nonce}'; img-src ${source}; connect-src 'none'; base-uri 'none'; form-action 'none';">
 <link rel="stylesheet" href="${resource('panel.css')}"><title>PilotPatch</title></head>
 <body>
-<header class="masthead"><h1>PilotPatch</h1><p>Microsoft Copilot Web</p></header>
+<header class="masthead"><h1>PilotPatch</h1><p id="reasoning">Microsoft Copilot Web</p></header>
 <main>
   <section class="workspace-section" aria-label="Target project">
     <strong id="workspace-name">Checking workspace…</strong>
@@ -61,28 +61,28 @@ function renderPanel(webview, extensionUri, Uri) {
     <div class="approval-actions"><button id="approve" type="button" class="primary">Approve</button>
       <button id="decline" type="button" class="secondary">Decline</button></div>
   </section>
-  <form id="task-form" hidden>
+  <section id="activity-section" class="activity" hidden><h2>Recent activity</h2><ol id="activity"></ol></section>
+  <footer id="tools" hidden><details><summary>Troubleshooting</summary><div class="tools">
+    <button id="repair" class="text-button">Prepare Edge extension files</button>
+    <button id="retest" class="text-button" hidden>Test Copilot connection</button>
+    <button id="login" class="text-button">Check Microsoft sign-in</button>
+    <button id="doctor" class="text-button">Check this laptop</button>
+    <button id="settings" class="text-button">Change backend Python</button>
+  </div></details></footer>
+</main>
+<form id="task-form" hidden>
     <label for="prompt">Ask a question or request a change</label>
     <textarea id="prompt" rows="3" maxlength="16000" spellcheck="false" placeholder="How does this project work?" aria-describedby="prompt-help"></textarea>
     <div class="composer-footer"><span id="prompt-help">Ctrl / ⌘ + Enter to send</span><span id="counter">0 / 16,000</span></div>
     <details class="task-options"><summary>Permissions and preview</summary><div class="options">
       <div class="mode"><label for="mode">Permissions</label><select id="mode">
-        <option value="approve">Approve changes</option><option value="read-only">Read only</option>
+        <option value="approve">Review and apply</option><option value="read-only">Read only</option>
         <option value="auto-edit">Auto-edit files</option></select></div>
       <label class="checkbox"><input id="dry-run" type="checkbox"> Preview only</label>
     </div>
-    <p id="mode-note" class="subtle">Review proposed changes and commands before they run.</p></details>
+    <p id="mode-note" class="subtle">PilotPatch prepares the edits and presents one review before applying them.</p></details>
     <button id="run" type="submit" class="primary">Send</button>
-  </form>
-  <section id="activity-section" class="activity" hidden><h2>Recent activity</h2><ol id="activity"></ol></section>
-</main>
-<footer id="tools" hidden><details><summary>Troubleshooting</summary><div class="tools">
-  <button id="repair" class="text-button">Show Edge setup paths</button>
-  <button id="retest" class="text-button" hidden>Test Copilot connection</button>
-  <button id="login" class="text-button">Check Microsoft sign-in</button>
-  <button id="doctor" class="text-button">Check this laptop</button>
-  <button id="settings" class="text-button">Change backend Python</button>
-</div></details></footer>
+</form>
 <script nonce="${nonce}" src="${resource('panel.js')}"></script></body></html>`;
 }
 

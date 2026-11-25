@@ -1,4 +1,3 @@
-import difflib
 import os
 import uuid
 from pathlib import Path
@@ -8,6 +7,7 @@ from pilotpatch.security.redaction import redact
 from pilotpatch.security.storage import atomic_bytes, atomic_json
 from pilotpatch.tools.patch import apply_unified
 from pilotpatch.tools.repository import Repository, sha256
+from pilotpatch.tools.review import Change, ReviewRepository, text_diff
 
 
 class FileTools:
@@ -26,12 +26,6 @@ class FileTools:
         self.dry_run = dry_run
         self.preview = preview
 
-    def _existing(self, name):
-        path = self.repo.guard.resolve(name)
-        if path.exists():
-            return self.repo.raw(name)
-        return None
-
     def _backup(self, name: str, before: bytes | None, after: bytes | None):
         record = self.state_dir / "backups" / uuid.uuid4().hex
         record.mkdir(parents=True)
@@ -49,48 +43,53 @@ class FileTools:
     def _change(
         self, name: str, before: bytes | None, after: bytes | None, *, destructive: bool = False
     ) -> dict:
-        path = self.repo.guard.resolve(name)
+        self.repo.guard.resolve(name)
         if before is not None:
             text = before.decode("utf-8-sig")
             if redact(text) != text:
                 raise ValueError("File contains redacted credential patterns; edit it manually")
         if after is not None and len(after) > self.repo.config.max_file_bytes:
             raise ValueError("Proposed file exceeds the file size limit")
-        diff = "".join(
-            difflib.unified_diff(
-                (before or b"").decode("utf-8-sig").splitlines(keepends=True),
-                (after or b"").decode("utf-8-sig").splitlines(keepends=True),
-                fromfile=f"a/{name}" if before is not None else "/dev/null",
-                tofile=f"b/{name}" if after is not None else "/dev/null",
+        diff = text_diff(name, before, after)
+        if isinstance(self.repo, ReviewRepository):
+            self.repo.stage(name, before, after)
+            return dict(
+                path=name,
+                applied=False,
+                staged=True,
+                sha256=sha256(after) if after is not None else None,
             )
-        )
-        self.preview(redact(diff))
+        self.preview(diff)
         if self.dry_run:
-            return dict(path=name, diff=redact(diff), applied=False, dry_run=True)
+            return dict(path=name, diff=diff, applied=False, dry_run=True)
         self.permissions.require(f"Apply change to {name}?", destructive=destructive)
+        self.apply_change(Change(name, before, after))
+        return dict(
+            path=name,
+            diff=diff,
+            applied=True,
+            sha256=sha256(after) if after is not None else None,
+        )
+
+    def apply_change(self, change: Change):
         # Re-resolve and re-read after approval to reject edits made while reviewing.
+        name, before, after = change.name, change.before, change.after
         path = self.repo.guard.resolve(name)
-        if self._existing(name) != before:
+        if self.repo.existing(name) != before:
             raise ValueError("File changed while awaiting approval; re-read before editing")
         self._backup(name, before, after)
         if after is None:
             path.unlink()
         else:
             previous_mode = path.stat().st_mode if path.exists() else None
-            atomic_bytes(path, after)
+            atomic_bytes(path, after, exclusive=before is None)
             if previous_mode is not None:
                 os.chmod(path, previous_mode)
             if path.read_bytes() != after:
                 raise OSError("Write verification failed; inspect session backups")
-        return dict(
-            path=name,
-            diff=redact(diff),
-            applied=True,
-            sha256=sha256(after) if after is not None else None,
-        )
 
     def write(self, name: str, content: str, expected_sha256: str | None) -> dict:
-        before = self._existing(name)
+        before = self.repo.existing(name)
         if before is not None and (expected_sha256 is None or sha256(before) != expected_sha256):
             raise ValueError("Existing file requires the current SHA256 from read_file")
         if before is None and expected_sha256 is not None:
@@ -112,7 +111,7 @@ class FileTools:
         if not first.startswith("--- a/"):
             raise ValueError("Patch must start with --- a/path")
         name = first[6:]
-        before = self._existing(name)
+        before = self.repo.existing(name)
         _, after = apply_unified(patch, (before or b"").decode("utf-8-sig"))
         data = after.encode("utf-8")
         if before and before.startswith(b"\xef\xbb\xbf"):
@@ -129,8 +128,20 @@ class FileTools:
         source = self.repo.guard.resolve(name)
         target = self.repo.guard.resolve(destination)
         before = self.repo.raw(name)
-        if target.exists() or source == target or sha256(before) != expected_sha256:
+        if (
+            self.repo.existing(destination) is not None
+            or source == target
+            or sha256(before) != expected_sha256
+        ):
             raise ValueError("Rename destination exists or source hash mismatch")
+        if isinstance(self.repo, ReviewRepository):
+            # Stage the destination first: a failed target validation must leave the source intact.
+            text = before.decode("utf-8-sig")
+            if redact(text) != text:
+                raise ValueError("File contains redacted credential patterns; rename it manually")
+            self.repo.stage(destination, None, before)
+            self.repo.stage(name, before, None)
+            return dict(path=name, destination=destination, applied=False, staged=True)
         self.preview(f"Rename {name} -> {destination}")
         if self.dry_run:
             return dict(path=name, destination=destination, applied=False, dry_run=True)

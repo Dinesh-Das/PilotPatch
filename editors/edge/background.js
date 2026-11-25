@@ -1,7 +1,7 @@
 /* Only this trusted extension context holds the pairing token. No page-origin relay. */
 "use strict";
 importScripts("connection.js");
-const driverVersion = 3;
+const driverVersion = 4;
 let running = false;
 let wakeRequested = false;
 let popupAction = Promise.resolve();
@@ -42,13 +42,21 @@ async function operate(tabId, command, selected, authorizeCommit) {
   }
   // Packaged code in an isolated world; never execute strings supplied by the CLI/page.
   const injected = await chrome.scripting.executeScript({
-    target: {tabId}, files: ["content.js"], world: "ISOLATED"
+    target: {tabId}, files: ["mode.js", "content.js"], world: "ISOLATED"
   });
   const documentId = injected.find(frame => frame.frameId === 0)?.documentId;
   if (!documentId) throw new Error("selected_document_missing");
-  const send = phase => chrome.tabs.sendMessage(tabId,
-    {type: `pilotpatch-command-v${driverVersion}`, command, phase}, {documentId});
+  const send = (phase, item = command) => chrome.tabs.sendMessage(tabId,
+    {type: `pilotpatch-command-v${driverVersion}`, command: item, phase}, {documentId});
   await selected(); // Injection itself can outlive revocation; do not even prepare afterward.
+  if (command.action === "submit") {
+    // Mode selection can wait for the page to render. Recheck the tab lease before
+    // putting source text in the composer, and keep the text out of the mode request.
+    const {selectors, nonce} = command.payload;
+    const mode = await send("mode", {...command, payload: {selectors, nonce}});
+    if (mode?.failure) throw new Error(mode.failure);
+    await selected();
+  }
   let result = await send(command.action === "submit" ? "prepare" : "read");
   if (command.action === "submit" && !result?.failure) {
     if (result?.prepared !== true) throw new Error("prepare_failed");

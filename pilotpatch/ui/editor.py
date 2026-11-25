@@ -90,7 +90,7 @@ class EditorConsole:
             suffix = "\n[Preview truncated]" if len(diff) > 200000 else ""
             self.emit("preview", diff=diff[:200000] + suffix)
 
-    def confirm(self, message: str, *, source: bool = False) -> bool:
+    def confirm(self, message: str, *, source: bool = False, review: bool = False) -> bool:
         diff, self.diff = self.diff, None
         if diff and len(diff) > 200000:
             self.emit(
@@ -98,7 +98,9 @@ class EditorConsole:
             )
             return False
         identifier = uuid4().hex
-        self.emit("approval", id=identifier, message=message, diff=diff, source=source)
+        self.emit(
+            "approval", id=identifier, message=message, diff=diff, source=source, review=review
+        )
         while True:
             decision = self.decisions.get()
             if decision is None:

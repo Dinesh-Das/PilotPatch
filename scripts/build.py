@@ -22,6 +22,7 @@ EDGE_FILES = (
     "connection.js",
     "content.js",
     "manifest.json",
+    "mode.js",
     "popup.css",
     "popup.html",
     "popup.js",

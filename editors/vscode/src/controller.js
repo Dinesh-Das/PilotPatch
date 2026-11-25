@@ -240,7 +240,8 @@ class Controller {
     if (this.active !== active || active.stopping) return;
     if (message.type === 'approval' && typeof message.id === 'string') {
       active.approval = message;
-      this.update('running', message.source ? 'Approve source sharing to send.' : 'Review Copilot’s request below.');
+      this.update('running', message.source ? 'Approve source sharing to send.' :
+        message.review ? 'The draft is ready to review.' : 'Review Copilot’s request below.');
     } else if (message.type === 'session' && !active.turn) {
       active.turn = {id: message.id, user: active.user, previews: []};
       active.chat.push(active.turn);
@@ -267,7 +268,8 @@ class Controller {
     if (code === 0 && active.turn && outcome?.type === 'reply') {
       const result = outcome.result;
       Object.assign(active.turn, {reply: result.copilot.summary, notes: result.copilot.remaining_issues,
-        files: result.files_changed, checks: result.checks, dryRun: result.dry_run});
+        files: result.files_changed, checks: result.checks, dryRun: result.dry_run,
+        proposed: result.proposed_files, reviewStatus: result.review_status, reasoningMode: result.reasoning_mode});
       this.state.verified = true;
       this.update('finished', '', false);
       return;

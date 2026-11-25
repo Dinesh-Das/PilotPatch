@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 ToolName = Literal[
     "list_directory",
     "read_file",
+    "read_files",
     "read_file_range",
     "search_files",
     "search_content",

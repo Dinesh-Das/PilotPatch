@@ -3,7 +3,7 @@ import hashlib
 import json
 from collections import Counter
 
-from pilotpatch.agent.context import ContextBuilder
+from pilotpatch.agent.context import ContextBuilder, edit_request
 from pilotpatch.agent.protocol import FinalAnswer, ProtocolError, parse_message
 from pilotpatch.agent.state import SessionStore
 from pilotpatch.providers.base import CopilotProvider
@@ -31,11 +31,14 @@ class AgentLoop:
         store: SessionStore,
         state: dict,
         event=lambda _: None,
+        *,
+        review=None,
     ):
         self.provider, self.registry, self.store, self.state = provider, registry, store, state
-        self.context = ContextBuilder(registry.files.repo)
+        self.context = ContextBuilder(registry.files.repo, review=review is not None)
         self.config = registry.files.repo.config
         self.event = event
+        self.review = review
 
     async def run(
         self,
@@ -78,6 +81,13 @@ class AgentLoop:
         )
         counts = Counter(r["fingerprint"] for r in state["receipts"].values())
         corrections = 0
+        edit_retries = 0
+        editing = (
+            conversation is not None
+            and edit_request(state["task"])
+            and (self.config.permission_mode != "read-only" or state["dry_run"])
+        )
+        operator_declined = False
         try:
             while state["steps"] < self.config.max_steps:
                 state["steps"] += 1
@@ -97,10 +107,17 @@ class AgentLoop:
                         raise AgentStopped(
                             "Repeated invalid protocol from Copilot; session saved"
                         ) from exc
-                    prompt = (
-                        "Protocol error: return one valid JSON object using the provided schema. "
-                        "Omit explanations. No local action was executed for the invalid response."
+                    reminder = (
+                        "The previous response was invalid. PilotPatch runs local tools on your "
+                        "behalf. Request a tool with one tool_call JSON object, without prose."
                     )
+                    if state["receipts"]:
+                        recent = next(reversed(state["receipts"].values()))["result"]
+                        prompt = self.context.result(recent, reminder=reminder)
+                    else:
+                        prompt = self.context.initial(
+                            state["task"], conversation, reminder=reminder
+                        )
                     self.store.save(state)
                     continue
                 corrections = 0
@@ -108,11 +125,48 @@ class AgentLoop:
                     dict(role="assistant", content=redact_value(action.model_dump()))
                 )
                 if isinstance(action, FinalAnswer):
+                    edited = any(
+                        r["result"].get("result", {}).get(flag)
+                        for r in state["receipts"].values()
+                        for flag in ("applied", "staged", "dry_run")
+                        if r["result"]["tool"] in MUTATIONS
+                    )
+                    if (
+                        editing
+                        and not edited
+                        and not operator_declined
+                        and edit_retries < 2
+                        and state["steps"] < self.config.max_steps
+                    ):
+                        edit_retries += 1
+                        self.event(
+                            "Continuing to inspect the project and prepare the requested edits…"
+                        )
+                        reminder = (
+                            "PilotPatch runs repository tools for you. No requested edit has been "
+                            "prepared yet. Use read_files or search_content to obtain source, then "
+                            "request a concrete edit with replace_in_file, apply_patch "
+                            "or write_file. "
+                            "If a tool was denied, respect that decision."
+                        )
+                        if state["receipts"]:
+                            recent = next(reversed(state["receipts"].values()))["result"]
+                            prompt = self.context.result(recent, reminder=reminder)
+                        else:
+                            prompt = self.context.initial(
+                                state["task"], conversation, reminder=reminder
+                            )
+                        continue
+                    review = await self.review(action.summary) if self.review else {}
+                    if self.review and editing and not review:
+                        review["review_status"] = "no_draft"
                     report = dict(
                         copilot=redact_value(action.model_dump()),
                         files_changed=list(dict.fromkeys(state["changes"])),
                         checks=state["checks"],
                         dry_run=state["dry_run"],
+                        reasoning_mode=getattr(self.provider, "reasoning_mode", None),
+                        **review,
                         verification="Commands actually executed are listed under checks; "
                         "Copilot's narrative is not independent verification.",
                     )
@@ -140,6 +194,11 @@ class AgentLoop:
                     self.event(f"[{state['steps']}] Copilot requested {action.tool}")
                     self.store.audit(state, "tool_started", id=action.id, tool=action.tool)
                     result = await self.registry.execute(action)
+                    if (
+                        result.get("error", {}).get("message")
+                        == "Operator declined the proposed operation"
+                    ):
+                        operator_declined = True
                     state["receipts"][action.id] = dict(
                         fingerprint=key, result=redact_value(result)
                     )

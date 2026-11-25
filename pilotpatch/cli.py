@@ -13,6 +13,7 @@ import yaml
 from filelock import FileLock, Timeout
 
 from pilotpatch import __version__
+from pilotpatch.agent.context import edit_request
 from pilotpatch.agent.loop import AgentLoop
 from pilotpatch.agent.state import SessionStore
 from pilotpatch.browser.bridge import pairing
@@ -26,6 +27,7 @@ from pilotpatch.tools.command_runner import CommandRunner
 from pilotpatch.tools.filesystem import FileTools
 from pilotpatch.tools.registry import ToolRegistry
 from pilotpatch.tools.repository import Repository
+from pilotpatch.tools.review import ReviewRepository
 from pilotpatch.ui import terminal as ui
 from pilotpatch.ui.editor import EditorConsole
 
@@ -119,6 +121,50 @@ async def _task(args, config, store, state, *, resume=False, output=ui, conversa
     session_dir = store.directory(state["id"])
     lock = store.task_lock(state["id"])
     provider = browser_provider(args.home, config)
+    review_repo = (
+        ReviewRepository(repo) if output is not ui and state.get("editor_review") else None
+    )
+
+    async def review_changes(summary):
+        changes = sorted(review_repo.changes.values(), key=lambda item: item.after is None)
+        if not changes:
+            return {}
+        names = [item.name for item in changes]
+        diff = "".join(item.diff() for item in changes)
+        if state["dry_run"]:
+            output.preview(diff)
+            return dict(proposed_files=names, review_status="preview")
+        state["status"] = "awaiting_review"
+        store.save(state)
+        output.preview(diff)
+        if not output.confirm(
+            f"{summary}\n\nApply {len(names)} proposed file changes to your project?",
+            review=True,
+        ):
+            store.audit(state, "review_declined", file_count=len(names))
+            return dict(proposed_files=names, review_status="discarded")
+        store.audit(state, "review_approved", file_count=len(names))
+        for change in changes:
+            if repo.existing(change.name) != change.before:
+                raise ValueError(
+                    f"{change.name} changed during review. The proposed changes were not applied."
+                )
+        target = FileTools(repo, session_dir, permissions)
+        output.event("Applying the approved changes…")
+        for change in changes:
+            state["pending"] = dict(
+                id="apply_review",
+                tool="apply_review",
+                path=change.name,
+            )
+            store.save(state)
+            target.apply_change(change)
+            state["changes"].append(change.name)
+            state["pending"] = None
+            store.save(state)
+            await asyncio.sleep(0)
+        return dict(proposed_files=names, review_status="applied")
+
     try:
         with lock:
             if resume:
@@ -135,10 +181,25 @@ async def _task(args, config, store, state, *, resume=False, output=ui, conversa
                     "Microsoft sign-in. Run Test connection before retrying."
                 )
             files = FileTools(
-                repo, session_dir, permissions, dry_run=state["dry_run"], preview=output.preview
+                review_repo or repo,
+                session_dir,
+                permissions,
+                dry_run=state["dry_run"],
+                preview=output.preview,
             )
-            tools = ToolRegistry(files, CommandRunner(repo, permissions, state["dry_run"]))
-            loop = AgentLoop(provider, tools, store, state, output.event)
+            tools = ToolRegistry(
+                files,
+                CommandRunner(repo, permissions, state["dry_run"]),
+                preparing_edits=review_repo is not None and edit_request(state["task"]),
+            )
+            loop = AgentLoop(
+                provider,
+                tools,
+                store,
+                state,
+                output.event,
+                review=review_changes if review_repo is not None else None,
+            )
             result = await loop.run(
                 resume=resume,
                 resolve_pending=args.resolve_pending == "skip",
@@ -168,6 +229,10 @@ async def _editor_chat(args, config, store) -> int:
             return 0
         Repository(args.project, config)
         state = store.create(args.project, request.prompt, args.dry_run)
+        state["editor_review"] = config.permission_mode == "approve" or (
+            args.dry_run and config.permission_mode != "read-only"
+        )
+        store.save(state)
         output.emit("session", id=state["id"])
         result = await _task(
             args,
@@ -456,6 +521,7 @@ def _prepare_connection(home: Path):
         "background.js",
         "connection.js",
         "content.js",
+        "mode.js",
         "popup.html",
         "popup.css",
         "popup.js",
@@ -549,6 +615,11 @@ async def dispatch(args) -> int:
         if len(args.arguments) != 1:
             raise ValueError("Usage: copilot-agent resume SESSION_ID")
         state = store.load(args.arguments[0])
+        if state.get("editor_review") and state["status"] != "completed":
+            raise ValueError(
+                "This editor review was interrupted. Check the working tree and start a new "
+                "editor turn. Approved writes that already happened are recorded in history."
+            )
         resumed_project = await asyncio.to_thread(Path(state["project"]).resolve)
         if args.home.is_relative_to(resumed_project):
             raise ValueError("State directory must be outside resumed project")

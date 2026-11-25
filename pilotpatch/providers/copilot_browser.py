@@ -11,6 +11,14 @@ from pilotpatch.config import Config
 from pilotpatch.providers.base import AuthenticationRequired, ProviderError
 
 
+def mode_script() -> str:
+    package = Path(__file__).resolve().parents[1]
+    source = package / "edge_extension" / "mode.js"
+    if not source.is_file():
+        source = package.parent / "editors" / "edge" / "mode.js"
+    return f"() => {{\n{source.read_text(encoding='utf-8')}\nreturn selectCopilotMode();\n}}"
+
+
 class CopilotBrowser:
     def __init__(self, home: Path, config: Config):
         self.config = config
@@ -18,6 +26,7 @@ class CopilotBrowser:
         self.page = None
         self.conversation_url = None
         self.poisoned = False
+        self.reasoning_mode = None
 
     async def open(self):
         self.page = await self.session.open()
@@ -134,6 +143,13 @@ class CopilotBrowser:
             raise ProviderError("Prompt exceeds configured context budget")
         if await self._visible(self.config.selectors.stop):
             raise ProviderError("Copilot is already generating; wait before starting another turn")
+        before = self.page.url
+        self.reasoning_mode = await self.page.evaluate(mode_script())
+        if self.page.url != before:
+            raise ProviderError(
+                "Copilot navigated while selecting a mode. No prompt was submitted."
+            )
+        await self._check_ready()
         nonce = secrets.token_hex(12)
         submitted = prompt + f"\nPilotPatch request_id: {nonce}. Do not echo this marker."
         composer = (await self._visible(self.config.selectors.composer))[0]

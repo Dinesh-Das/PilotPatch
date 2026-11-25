@@ -87,12 +87,21 @@ class Repository:
             raise ValueError("File does not exist or is not a regular file")
         with path.open("rb") as stream:
             data = stream.read(self.config.max_file_bytes + 1)
+        return self.validate_text(data)
+
+    def validate_text(self, data: bytes) -> bytes:
         if len(data) > self.config.max_file_bytes:
             raise ValueError("File too large; use read_file_range")
         if b"\x00" in data:
             raise ValueError("Binary files are excluded")
         data.decode("utf-8-sig")
         return data
+
+    def existing(self, name: str) -> bytes | None:
+        return self.raw(name) if self.guard.resolve(name).exists() else None
+
+    def open_text_bytes(self, name: str):
+        return self.guard.resolve(name).open("rb")
 
     def read(self, name: str) -> dict:
         data = self.raw(name)
@@ -105,11 +114,10 @@ class Repository:
     def read_range(self, name: str, start: int, end: int) -> dict:
         if start < 1 or end < start or end - start > 500:
             raise ValueError("Request 1-based inclusive ranges of at most 501 lines")
-        path = self.guard.resolve(name)
         lines = []
         total_bytes = 0
         # Bounded scanning even if a file contains extremely long lines.
-        with path.open("rb") as stream:
+        with self.open_text_bytes(name) as stream:
             for number in range(1, min(end + 1, 100001)):
                 line = stream.readline(self.config.max_file_bytes + 1)
                 total_bytes += len(line)

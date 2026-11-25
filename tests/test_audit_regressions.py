@@ -153,18 +153,25 @@ def test_approval_prompt_does_not_interpret_command_markup(monkeypatch):
 
 
 @pytest.mark.browser
-async def test_revocation_while_injecting_does_not_even_fill_the_old_tab(connected_edge):
+@pytest.mark.parametrize("stage", ["injection", "mode"])
+async def test_revocation_during_preparation_does_not_fill_the_old_tab(connected_edge, stage):
     provider, page, worker = connected_edge
     await provider.status()  # Inject once, before adding the delayed API wrapper.
-    await worker.evaluate("""() => {
-      const original=chrome.scripting.executeScript.bind(chrome.scripting);
+    await worker.evaluate(
+        """stage => {
+      const service=stage === 'mode' ? chrome.tabs : chrome.scripting;
+      const method=stage === 'mode' ? 'sendMessage' : 'executeScript';
+      const original=service[method].bind(service);
       globalThis.injectionPending=false;
-      chrome.scripting.executeScript=async (...args) => {
+      service[method]=async (...args) => {
+        if (stage === 'mode' && args[1]?.phase !== 'mode') return original(...args);
         globalThis.injectionPending=true;
         await new Promise(resolve => {globalThis.releaseInjection=resolve;});
         return original(...args);
       };
-    }""")
+    }""",
+        stage,
+    )
     task = asyncio.create_task(provider.send("Must not enter revoked composer"))
     try:
         for _ in range(100):

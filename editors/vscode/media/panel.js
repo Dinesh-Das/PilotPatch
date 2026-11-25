@@ -8,6 +8,7 @@
   let state = {busy: false, workspace: '', configured: false, trusted: true, remote: false};
   let submitted;
   let previousChat = '';
+  let previousApproval;
   const draft = api.getState();
   if (draft && typeof draft.prompt === 'string') prompt.value = draft.prompt.slice(0, 16000);
   if (draft && ['approve', 'read-only', 'auto-edit'].includes(draft.mode)) mode.value = draft.mode;
@@ -24,7 +25,7 @@
     element('mode-note').textContent = dryRun.checked ? 'Preview edits only. Commands will not run.' :
       mode.value === 'read-only' ? 'Explore source only. Edits and commands are denied.' :
       mode.value === 'auto-edit' ? 'File edits apply automatically. Commands still need approval.' :
-      'Review proposed changes and commands before they run.';
+      'PilotPatch prepares the edits and presents one review before applying them.';
     api.setState({prompt: prompt.value, mode: mode.value, dryRun: dryRun.checked,
       project: state.project || draft?.project});
   }
@@ -85,7 +86,7 @@
   }
 
   function renderChat(chat, canRun) {
-    const log = element('messages');
+    const log = element('messages'), scroll = log.closest('main');
     element('conversation').hidden = !canRun || !chat.length;
     element('clear-chat').disabled = state.busy;
     const snapshot = JSON.stringify(chat);
@@ -101,10 +102,16 @@
         markdown(add(row, 'div', '', 'utterance reply'), turn.reply);
       }
       if (turn.error) add(row, 'p', turn.error, 'turn-error');
-      if (turn.files?.length || turn.checks?.length || turn.notes?.length || turn.previews?.length || turn.dryRun) {
+      const reviewStatus = {preview: 'Preview only', discarded: 'Draft discarded',
+        applied: 'Changes applied', no_draft: 'No changes drafted'}[turn.reviewStatus];
+      if (reviewStatus) add(row, 'p', reviewStatus, 'review-status');
+      if (turn.files?.length || turn.proposed?.length || turn.checks?.length || turn.notes?.length || turn.previews?.length || turn.dryRun) {
         const details = add(row, 'details', '');
         add(details, 'summary', turn.dryRun ? 'Preview and details' : 'Changes and details');
         for (const file of turn.files || []) add(details, 'p', `Changed ${file}`);
+        if (turn.reviewStatus === 'preview') {
+          for (const file of turn.proposed || []) add(details, 'p', `Proposed ${file}`);
+        }
         for (const check of turn.checks || []) {
           const status = check.timed_out ? 'Timed out' : `Exit ${check.exit_code}`;
           add(details, 'p', `${status} · ${check.argv.join(' ')}`);
@@ -113,17 +120,24 @@
         for (const diff of turn.previews || []) add(details, 'pre', diff);
       }
     }
-    log.scrollTop = log.scrollHeight;
+    if (chat.length) log.lastElementChild?.scrollIntoView({block: 'end'});
+    else scroll.scrollTop = 0;
   }
 
   function renderApproval(approval, allowed) {
     element('approval').hidden = !allowed || !approval;
-    element('approval-title').textContent = approval?.source ? 'Share with Microsoft Copilot Web' : 'Review proposed action';
+    element('approval-title').textContent = approval?.source ? 'Share with Microsoft Copilot Web' :
+      approval?.review ? 'Review changes' : 'Review proposed action';
     element('approval-message').textContent = approval?.message || '';
     element('approval-diff').textContent = approval?.diff || '';
     element('approval-diff').hidden = !approval?.diff;
-    element('approve').textContent = approval?.source ? 'Share and send' : 'Approve';
+    element('approve').textContent = approval?.source ? 'Share and send' : approval?.review ? 'Apply changes' : 'Approve';
+    element('decline').textContent = approval?.review ? 'Discard draft' : 'Decline';
     for (const id of ['approve', 'decline']) element(id).disabled = !approval;
+    if (allowed && approval && approval.id !== previousApproval) {
+      element('approval').scrollIntoView({block: 'nearest'});
+    }
+    previousApproval = approval?.id;
   }
 
   function decide(approved) {
@@ -152,6 +166,9 @@
     state = event.data;
     if (lastProject && state.project !== lastProject) prompt.value = '';
     const lastTurn = state.chat?.at(-1);
+    const lastMode = state.chat?.filter(turn => turn.reasoningMode).at(-1)?.reasoningMode;
+    const label = {think_deeper: 'Think Deeper', auto: 'Auto', current: 'Mode unverified'}[lastMode];
+    element('reasoning').textContent = label ? `Microsoft Copilot Web · ${label}` : 'Microsoft Copilot Web';
     if (lastTurn && submitted && submitted.project === state.project && lastTurn.id !== submitted.last &&
         lastTurn.user === submitted.text.trim()) {
       if (prompt.value === submitted.text) prompt.value = '';

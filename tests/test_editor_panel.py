@@ -189,6 +189,20 @@ async def test_conversation_shows_reply_and_requests_explicit_approval_in_panel(
     await publish(page, chat=[turn], busy=True, verified=True, operation="chat")
     assert await prompt.input_value() == ""
     await publish(
+        page,
+        chat=[turn],
+        busy=True,
+        operation="chat",
+        approval=dict(id="b" * 32, review=True, message="Polish the layout", diff="+.hero {}"),
+    )
+    assert "+.hero {}" in await page.get_by_label("Proposed change").inner_text()
+    await page.get_by_role("button", name="Apply changes").click()
+    assert await page.evaluate("window.panelMessages.at(-1)") == dict(
+        type="decision",
+        id="b" * 32,
+        approved=True,
+    )
+    await publish(
         page, chat=[dict(turn, reply="## Jump\n- See `bird.py`.\n<img src=x>")], verified=True
     )
     log = page.get_by_role("log")

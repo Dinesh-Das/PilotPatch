@@ -16,6 +16,7 @@ class CopilotExistingEdge:
         self.config = config
         self.bridge = Bridge(home)
         self.poisoned = False
+        self.reasoning_mode = None
 
     async def open(self):
         pairing(self.home)  # Setup must be explicit; do not launch any browser as fallback.
@@ -108,6 +109,8 @@ class CopilotExistingEdge:
             )
             if result.get("submitted") is not True:
                 raise ProviderError("Copilot submission could not be confirmed; inspect Edge")
+            mode = result.get("reasoning_mode")
+            self.reasoning_mode = mode if mode in ("think_deeper", "auto") else "current"
             deadline = time.monotonic() + self.config.response_timeout
             previous, stable_since = None, time.monotonic()
             while time.monotonic() < deadline:

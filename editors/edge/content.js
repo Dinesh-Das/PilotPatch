@@ -1,7 +1,7 @@
 /* Public visible DOM only. No cookies, auth storage, internal endpoints or page messages. */
 (() => {
   "use strict";
-  const driverVersion = 3;
+  const driverVersion = 4;
   if (globalThis.__pilotpatchDriver === driverVersion) return;
   globalThis.__pilotpatchDriver = driverVersion;
   const hosts = ["copilot.com", "copilot.microsoft.com", "copilot.ai"];
@@ -96,7 +96,7 @@
       busy: answer.getAttribute("aria-busy") === "true" || !!answer.querySelector('[aria-busy="true"]'),
       generating: find(s.stop).length > 0};
   }
-  function operate(command, phase) {
+  async function operate(command, phase) {
     const url = new URL(location.href);
     if (url.protocol !== "https:" || url.port || !hosts.includes(url.hostname)) throw new Error("wrong_origin");
     if (!command || !/^[a-f0-9]{32}$/.test(command.id)) throw new Error("invalid_command");
@@ -121,25 +121,29 @@
         throw new Error("send_disabled");
       }
       activeNonce = pending.nonce;
+      const mode = currentCopilotMode();
       buttons[0].click();
-      return {submitted: true};
+      return {submitted: true, reasoning_mode: mode};
     }
     if (seen.has(command.id)) throw new Error("duplicate_command");
-    seen.set(command.id, true);
-    if (seen.size > 128) seen.delete(seen.keys().next().value);
+    if (phase !== "mode") {
+      seen.set(command.id, true);
+      if (seen.size > 128) seen.delete(seen.keys().next().value);
+    }
     const p = command.payload, s = p?.selectors;
     if (!s || Object.values(s).some(value => typeof value !== "string" || value.length > 4096)) throw new Error("invalid_selectors");
     if (command.action === "status") return status(s);
     if (!/^[a-f0-9]{24}$/.test(p.nonce)) throw new Error("invalid_nonce");
     if (command.action === "response") return response(s, p.nonce, p.max);
     if (command.action !== "submit") throw new Error("unsupported_action");
-    if (phase !== "prepare") throw new Error("unsupported_action");
     const current = status(s), composer = find(s.composer);
     if (!current.authenticated || !current.chat_ready || find(s.stop).length) throw new Error("not_ready");
-    if (typeof p.text !== "string" || p.text.length > 501000) throw new Error("invalid_prompt");
     // Preserve unsent user work in the selected everyday tab.
     const field = composer[0];
     if (composerText(field).trim()) throw new Error("composer_has_draft");
+    if (phase === "mode") return {mode: await selectCopilotMode()};
+    if (phase !== "prepare") throw new Error("unsupported_action");
+    if (typeof p.text !== "string" || p.text.length > 501000) throw new Error("invalid_prompt");
     const sends = find(s.send);
     if (sends.length > 1) throw new Error("send_control_not_unique");
     consumePreparation();

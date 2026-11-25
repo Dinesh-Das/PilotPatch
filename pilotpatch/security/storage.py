@@ -36,7 +36,7 @@ def private_directory(path: Path) -> None:
         path.chmod(0o700)
 
 
-def atomic_bytes(path: Path, data: bytes) -> None:
+def atomic_bytes(path: Path, data: bytes, *, exclusive: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary = tempfile.mkstemp(prefix=".pilotpatch-", dir=path.parent)
     try:
@@ -44,7 +44,12 @@ def atomic_bytes(path: Path, data: bytes) -> None:
             stream.write(data)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        if not exclusive:
+            os.replace(temporary, path)
+        elif os.name == "nt":
+            os.rename(temporary, path)
+        else:
+            os.link(temporary, path)
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
