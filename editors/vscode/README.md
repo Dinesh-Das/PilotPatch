@@ -47,6 +47,11 @@ in the selected Copilot tab to clear the remote conversation too. Drafts are sto
 in the editor’s local webview state. Chat messages travel to the backend through a
 local pipe. The backend applies source-sharing consent before sending project context.
 
+Send **“Audit the codebase and suggest improvements”** to start a read-only audit.
+After you approve source sharing, PilotPatch continues across source batches and
+collects Copilot’s findings. The sidebar shows the file coverage and marks a
+partial audit when a limit or an unusable Copilot response prevents completion.
+
 ## Build and test
 
 From the repository root, run `build.cmd`. It produces the VSIX under `artifacts`.

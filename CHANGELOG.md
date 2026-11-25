@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.2 — 2026-11-25
+
+- Run codebase audits as read-only, multi-turn reviews with automatic source,
+  test and configuration batches.
+- Wait for audit synthesis and show actual file coverage, including partial results
+  when a limit or Copilot response prevents completion.
+
 ## 0.4.1 — 2026-11-25
 
 - Recognize the signed-in Copilot profile when its sidebar is collapsed. A visible

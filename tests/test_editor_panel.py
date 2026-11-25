@@ -215,3 +215,29 @@ async def test_conversation_shows_reply_and_requests_explicit_approval_in_panel(
     assert (await page.evaluate("window.panelMessages.at(-1)"))[
         "prompt"
     ] == "Where is gravity configured?"
+
+
+@pytest.mark.browser
+async def test_sidebar_identifies_partial_audit_and_reports_actual_coverage(editor_panel):
+    page, _ = editor_panel
+    await publish(
+        page,
+        verified=True,
+        chat=[
+            dict(
+                id="audit",
+                user="Audit the codebase",
+                reply="A finding from the files supplied.",
+                audit=dict(
+                    status="partial",
+                    reason="step_limit",
+                    files_supplied=8,
+                    files_discovered=17,
+                    files_skipped=0,
+                    files_redacted=0,
+                ),
+            )
+        ],
+    )
+    assert await page.get_by_text("Partial audit · 8 of 17 eligible files supplied").is_visible()
+    assert await page.get_by_text("The audit reached the session’s step limit.").is_visible()

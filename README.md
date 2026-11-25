@@ -26,6 +26,11 @@ PilotPatch chooses **Think Deeper** when Copilot offers it and prefers **Auto** 
 it is unavailable. With **Review and apply** selected, PilotPatch gathers relevant
 source and prepares the combined file diff before asking for approval.
 
+Ask **“Audit the codebase and suggest improvements”** for a read-only review.
+After source sharing is approved, PilotPatch sends eligible source, tests and
+configuration in batches. The final report shows how much source was supplied
+and flags partial coverage when a scan, file or session limit is reached.
+
 Setup installs Python dependencies and the VSIX, prepares the Edge files, opens the
 Extensions page, and copies the folder path. To reopen setup later, click
 **Open Edge setup** in the PilotPatch panel. You need Windows 11 x64,

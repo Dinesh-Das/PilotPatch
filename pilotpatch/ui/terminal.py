@@ -30,6 +30,20 @@ def banner(project):
 
 def report(result: dict):
     console.print(Panel(Text(result["copilot"]["summary"]), title="Copilot summary"))
+    if audit := result.get("audit"):
+        console.print(
+            f"Audit coverage ({audit['status']}): {audit['files_supplied']}/"
+            f"{audit['files_discovered']} eligible files supplied.",
+            markup=False,
+        )
+        if audit["files_skipped"]:
+            console.print(f"Files skipped: {audit['files_skipped']}", markup=False)
+        if audit["files_redacted"]:
+            console.print(
+                f"Files supplied with redactions: {audit['files_redacted']}", markup=False
+            )
+        for skipped in audit.get("skipped", []):
+            console.print(f"{skipped['path']}: {skipped['reason']}", markup=False)
     console.print(f"Applied file changes: {len(result['files_changed'])}", markup=False)
     for path in result["files_changed"]:
         console.print(f"  {path}", markup=False)

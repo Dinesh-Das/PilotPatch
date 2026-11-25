@@ -46,10 +46,21 @@ class Repository:
         return specs
 
     def files(self, pattern: str = "*", limit: int = 2000) -> list[str]:
+        return self.scan_files(pattern, limit)[0]
+
+    def scan_files(self, pattern: str = "*", limit: int = 2000) -> tuple[list[str], bool]:
         result = []
         visited = 0
         deadline = time.monotonic() + 10
-        for directory, dirs, files in os.walk(self.root, followlinks=False):
+        limited = False
+
+        def unreadable(_):
+            nonlocal limited
+            limited = True
+
+        for directory, dirs, files in os.walk(self.root, followlinks=False, onerror=unreadable):
+            if time.monotonic() > deadline:
+                return result, True
             base = Path(directory)
             specs = self._ignore_specs(base)
 
@@ -71,15 +82,15 @@ class Repository:
             for name in sorted(files):
                 visited += 1
                 if visited > 50000 or time.monotonic() > deadline:
-                    return result
+                    return result, True
                 relative = (base / name).relative_to(self.root).as_posix()
                 if allowed(name, False) and (
                     fnmatch.fnmatchcase(relative, pattern) or Path(relative).match(pattern)
                 ):
-                    result.append(relative)
                     if len(result) >= limit:
-                        return result
-        return result
+                        return result, True
+                    result.append(relative)
+        return result, limited
 
     def raw(self, name: str) -> bytes:
         path = self.guard.resolve(name)

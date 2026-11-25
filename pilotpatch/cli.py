@@ -13,6 +13,7 @@ import yaml
 from filelock import FileLock, Timeout
 
 from pilotpatch import __version__
+from pilotpatch.agent.audit import audit_request
 from pilotpatch.agent.context import edit_request
 from pilotpatch.agent.loop import AgentLoop
 from pilotpatch.agent.state import SessionStore
@@ -98,11 +99,18 @@ def parser() -> argparse.ArgumentParser:
     return result
 
 
-def _consent(args, confirm):
+def _consent(args, confirm, *, audit=False):
+    scope = (
+        "Eligible source, tests and configuration will be shared in successive audit batches. "
+        if audit
+        else ""
+    )
     if not args.share_code and not confirm(
         "Send selected repository source, project instructions and tool results for this task to "
         "Microsoft Copilot at https://copilot.com/ using the account in the selected "
-        "Edge connection? Confirm your organization permits this destination and account"
+        "Edge connection? "
+        + scope
+        + "Confirm your organization permits this destination and account"
     ):
         raise PermissionError(
             "Source sharing declined. Use --share-code only when explicitly authorized"
@@ -111,7 +119,7 @@ def _consent(args, confirm):
 
 async def _task(args, config, store, state, *, resume=False, output=ui, conversation=None):
     if output is ui:
-        _consent(args, ui.confirm)
+        _consent(args, ui.confirm, audit=audit_request(state["task"]))
     project = Path(state["project"])
     if output is ui:
         ui.banner(project)
@@ -219,10 +227,15 @@ async def _editor_chat(args, config, store) -> int:
         if args.arguments or args.share_code:
             raise ValueError("Editor messages and source approvals must come from the editor")
         request = output.start()
+        audit_scope = (
+            " Eligible source, tests and configuration will be shared in successive audit batches."
+            if audit_request(request.prompt)
+            else ""
+        )
         if not output.confirm(
             "Send your message, recent conversation, selected project files, instructions and "
             "tool results to Microsoft Copilot Web? Confirm your organization permits sharing "
-            "with this destination and the account in the selected Edge chat.",
+            "with this destination and the account in the selected Edge chat." + audit_scope,
             source=True,
         ):
             output.emit("declined", message="Message was not sent. Source sharing was declined.")

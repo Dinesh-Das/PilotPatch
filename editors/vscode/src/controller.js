@@ -269,7 +269,8 @@ class Controller {
       const result = outcome.result;
       Object.assign(active.turn, {reply: result.copilot.summary, notes: result.copilot.remaining_issues,
         files: result.files_changed, checks: result.checks, dryRun: result.dry_run,
-        proposed: result.proposed_files, reviewStatus: result.review_status, reasoningMode: result.reasoning_mode});
+        proposed: result.proposed_files, reviewStatus: result.review_status, reasoningMode: result.reasoning_mode,
+        audit: result.audit});
       this.state.verified = true;
       this.update('finished', '', false);
       return;

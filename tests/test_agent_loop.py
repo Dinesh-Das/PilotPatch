@@ -125,6 +125,76 @@ async def test_editor_recovers_when_copilot_says_no_tools_for_ui_change(tmp_path
     assert "PilotPatch runs" in loop.provider.prompts[2]
 
 
+async def test_audit_supplies_flutter_sources_and_continues_after_an_early_final(tmp_path):
+    premature = {**final(), "summary": "Audit blocked. Please provide the Dart source."}
+    conclusions = {
+        **final(),
+        "summary": "Handle invalid input at lib/main.dart:3.",
+        "files_changed": [],
+    }
+    loop = make_loop(tmp_path, [premature, conclusions])
+    loop.state["task"] = "Audit the codebase and suggest improvements"
+    project = tmp_path / "repo"
+    (project / "lib").mkdir()
+    (project / "test").mkdir()
+    (project / "pubspec.yaml").write_text("name: flight_lab\n")
+    (project / "lib/main.dart").write_text("void main() { launch(); }\n")
+    (project / "test/widget_test.dart").write_text("void widgetTest() { assert(true); }\n")
+    (project / ".env").write_text("PRIVATE_AUDIT_FIXTURE=excluded\n")
+    result = await loop.run(conversation=[])
+    assert result["copilot"]["summary"] == conclusions["summary"]
+    assert result["audit"]["status"] == "complete"
+    assert result["audit"]["files_supplied"] == result["audit"]["files_discovered"] == 3
+    assert "name: flight_lab" in loop.provider.prompts[0]
+    assert "launch()" in loop.provider.prompts[0]
+    assert "widgetTest()" in loop.provider.prompts[0]
+    assert all("PRIVATE_AUDIT_FIXTURE" not in prompt for prompt in loop.provider.prompts)
+
+
+async def test_audit_step_limit_reports_partial_coverage(tmp_path):
+    loop = make_loop(tmp_path, [final()], max_steps=1, max_context_bytes=12000)
+    loop.state["task"] = "Audit this codebase"
+    project = tmp_path / "repo"
+    for index in range(16):
+        (project / f"module{index}.dart").write_text("void method() {}\n" * 150)
+    result = await loop.run()
+    assert result["audit"]["status"] == "partial"
+    assert 0 < result["audit"]["files_supplied"] < result["audit"]["files_discovered"] == 16
+    assert result["audit"]["reason"] == "step_limit"
+
+
+async def test_audit_advances_multiple_batches_and_blocks_project_writes(tmp_path):
+    responses = [
+        call("unsafe-edit", "write_file", path="extra.dart", content="bad"),
+        *[final()] * 9,
+    ]
+    loop = make_loop(tmp_path, responses, max_context_bytes=12000, permission_mode="auto-edit")
+    loop.state["task"] = "Audit this codebase"
+    project = tmp_path / "repo"
+    for index in range(7):
+        (project / f"module{index}.dart").write_text(f"void unique{index}() {{}}\n" * 150)
+    report = await loop.run()
+    prompts = loop.provider.prompts
+    assert sum("Inspect source batch" in prompt for prompt in prompts) > 1
+    assert all(any(f"unique{index}()" in prompt for prompt in prompts) for index in range(7))
+    assert all(len(prompt.encode()) <= 12000 for prompt in prompts)
+    assert "This audit is read only." in prompts[1]
+    assert not (project / "extra.dart").exists()
+    assert report["audit"]["files_supplied"] == 7
+    assert report["audit"]["status"] == "complete"
+
+
+async def test_audit_distinguishes_supplied_source_from_missing_model_findings(tmp_path):
+    blocked = {**final(), "summary": "Audit blocked. Please provide the source."}
+    loop = make_loop(tmp_path, [blocked] * 3)
+    loop.state["task"] = "Audit the codebase"
+    (tmp_path / "repo/app.dart").write_text("void main() {}\n")
+    report = await loop.run()
+    assert report["audit"]["files_supplied"] == 1
+    assert report["audit"]["status"] == "partial"
+    assert report["audit"]["reason"] == "provider_reply"
+
+
 async def test_duplicate_id_with_different_payload_rejected(tmp_path):
     loop = make_loop(tmp_path, [call("a", "list_directory"), call("a", "git_status")])
     with pytest.raises(AgentStopped, match="different arguments"):

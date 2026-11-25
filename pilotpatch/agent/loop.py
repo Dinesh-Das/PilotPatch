@@ -3,12 +3,13 @@ import hashlib
 import json
 from collections import Counter
 
+from pilotpatch.agent.audit import BLOCKED, AuditEvidence, audit_request
 from pilotpatch.agent.context import ContextBuilder, edit_request
 from pilotpatch.agent.protocol import FinalAnswer, ProtocolError, parse_message
 from pilotpatch.agent.state import SessionStore
 from pilotpatch.providers.base import CopilotProvider
 from pilotpatch.security.redaction import redact_value
-from pilotpatch.tools.registry import MUTATIONS, ToolRegistry
+from pilotpatch.tools.registry import EFFECTS, MUTATIONS, ToolRegistry
 
 
 class AgentStopped(RuntimeError):
@@ -39,6 +40,23 @@ class AgentLoop:
         self.config = registry.files.repo.config
         self.event = event
         self.review = review
+
+    def finish(self, answer: FinalAnswer, **details) -> dict:
+        state = self.state
+        report = dict(
+            copilot=redact_value(answer.model_dump()),
+            files_changed=list(dict.fromkeys(state["changes"])),
+            checks=state["checks"],
+            dry_run=state["dry_run"],
+            reasoning_mode=getattr(self.provider, "reasoning_mode", None),
+            verification="Commands actually executed are listed under checks; "
+            "Copilot's narrative is not independent verification.",
+            **details,
+        )
+        state["status"], state["final"] = "completed", report
+        self.store.save(state)
+        self.store.audit(state, "completed", steps=state["steps"])
+        return report
 
     async def run(
         self,
@@ -74,11 +92,19 @@ class AgentLoop:
             state["messages"].append(dict(role="tool", content=result))
             state["pending"] = None
             self.store.save(state)
-        prompt = (
-            self.context.resume(state)
-            if resume
-            else self.context.initial(state["task"], conversation)
+        audit = (
+            AuditEvidence(self.registry.files.repo, state["task"])
+            if audit_request(state["task"])
+            else None
         )
+        if audit:
+            prompt = audit.next_prompt()
+        else:
+            prompt = (
+                self.context.resume(state)
+                if resume
+                else self.context.initial(state["task"], conversation)
+            )
         counts = Counter(r["fingerprint"] for r in state["receipts"].values())
         corrections = 0
         edit_retries = 0
@@ -90,19 +116,49 @@ class AgentLoop:
         operator_declined = False
         try:
             while state["steps"] < self.config.max_steps:
+                if (
+                    audit
+                    and state["steps"] > 0
+                    and not audit.summary_phase
+                    and state["steps"] == self.config.max_steps - 1
+                ):
+                    prompt = audit.next_prompt(synthesis=True)
                 state["steps"] += 1
                 state["status"] = "awaiting_response"
                 state["messages"].append(dict(role="user", content=prompt))
+                state["messages"] = state["messages"][-30:]
                 self.store.save(state)
-                self.event(f"[{state['steps']}] Sending context to Microsoft Copilot")
+                if audit:
+                    coverage = f"{len(audit.supplied)}/{len(audit.paths)} eligible files supplied."
+                    phase = (
+                        "Preparing the audit report"
+                        if audit.summary_phase
+                        else f"Reviewing source batch {audit.batch_count}"
+                    )
+                    self.event(f"{phase} · {coverage}")
+                else:
+                    self.event(f"[{state['steps']}] Sending context to Microsoft Copilot")
                 self.store.audit(state, "prompt_attempted", step=state["steps"])
                 response = await self.provider.send(prompt)
+                if audit:
+                    audit.delivered()
                 state["conversation_url"] = getattr(self.provider, "conversation_url", None)
                 try:
                     action = parse_message(response, self.config.max_response_bytes)
                 except ProtocolError as exc:
                     corrections += 1
                     self.store.audit(state, "format_error", step=state["steps"])
+                    if audit:
+                        if corrections > self.config.format_retries:
+                            return self.finish(
+                                audit.partial_answer(),
+                                audit=audit.coverage(reason="provider_reply"),
+                            )
+                        prompt = audit.prompt(
+                            "Return one valid JSON object for the current audit stage. "
+                            "Use the source evidence supplied with this message or earlier batches."
+                        )
+                        continue
                     if corrections > self.config.format_retries:
                         raise AgentStopped(
                             "Repeated invalid protocol from Copilot; session saved"
@@ -125,6 +181,28 @@ class AgentLoop:
                     dict(role="assistant", content=redact_value(action.model_dump()))
                 )
                 if isinstance(action, FinalAnswer):
+                    if audit:
+                        if not audit.summary_phase:
+                            audit.record(action)
+                            if state["steps"] == self.config.max_steps:
+                                break
+                            prompt = audit.next_prompt(
+                                synthesis=state["steps"] == self.config.max_steps - 1
+                            )
+                            continue
+                        if BLOCKED.search(action.summary):
+                            if state["steps"] < self.config.max_steps and not audit.summary_retry:
+                                audit.summary_retry = True
+                                prompt = audit.prompt(
+                                    "PilotPatch supplied source below and in earlier batches. "
+                                    "Use it to produce the report, or request a specific read tool."
+                                )
+                                continue
+                            return self.finish(
+                                audit.partial_answer(),
+                                audit=audit.coverage(reason="provider_reply"),
+                            )
+                        return self.finish(action, audit=audit.coverage())
                     edited = any(
                         r["result"].get("result", {}).get(flag)
                         for r in state["receipts"].values()
@@ -160,20 +238,7 @@ class AgentLoop:
                     review = await self.review(action.summary) if self.review else {}
                     if self.review and editing and not review:
                         review["review_status"] = "no_draft"
-                    report = dict(
-                        copilot=redact_value(action.model_dump()),
-                        files_changed=list(dict.fromkeys(state["changes"])),
-                        checks=state["checks"],
-                        dry_run=state["dry_run"],
-                        reasoning_mode=getattr(self.provider, "reasoning_mode", None),
-                        **review,
-                        verification="Commands actually executed are listed under checks; "
-                        "Copilot's narrative is not independent verification.",
-                    )
-                    state["status"], state["final"] = "completed", report
-                    self.store.save(state)
-                    self.store.audit(state, "completed", steps=state["steps"])
-                    return report
+                    return self.finish(action, **review)
                 key = fingerprint(action)
                 prior = state["receipts"].get(action.id)
                 if prior:
@@ -193,7 +258,16 @@ class AgentLoop:
                     self.store.save(state)
                     self.event(f"[{state['steps']}] Copilot requested {action.tool}")
                     self.store.audit(state, "tool_started", id=action.id, tool=action.tool)
-                    result = await self.registry.execute(action)
+                    if audit and action.tool in EFFECTS:
+                        result = dict(
+                            type="tool_result",
+                            id=action.id,
+                            tool=action.tool,
+                            success=False,
+                            error=dict(code="PermissionError", message="This audit is read only."),
+                        )
+                    else:
+                        result = await self.registry.execute(action)
                     if (
                         result.get("error", {}).get("message")
                         == "Operator declined the proposed operation"
@@ -230,7 +304,15 @@ class AgentLoop:
                 if len(state["messages"]) > 30:
                     state["messages"] = state["messages"][-30:]
                 self.store.save(state)
-                prompt = self.context.result(result)
+                reminder = ""
+                if audit:
+                    stage = "final audit report" if audit.summary_phase else "current source batch"
+                    reminder = f"Continue the read-only audit and report on the {stage}."
+                prompt = self.context.result(result, reminder=reminder)
+            if audit:
+                return self.finish(
+                    audit.partial_answer(), audit=audit.coverage(reason="step_limit")
+                )
             raise AgentStopped("Maximum agent steps reached; increase max_steps to resume")
         except (asyncio.CancelledError, KeyboardInterrupt):
             state["status"] = "cancelled"

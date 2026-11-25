@@ -101,6 +101,25 @@
         add(row, 'strong', 'Copilot');
         markdown(add(row, 'div', '', 'utterance reply'), turn.reply);
       }
+      if (turn.audit) {
+        const audit = turn.audit;
+        const label = audit.status === 'complete' ? 'Audit coverage' : 'Partial audit';
+        add(row, 'p', `${label} · ${audit.files_supplied} of ${audit.files_discovered} eligible files supplied`, 'review-status');
+        const limits = {
+          step_limit: 'The audit reached the session’s step limit.',
+          inventory_limit: 'The repository scan stopped before it could inventory every file.',
+          no_source: 'No eligible source files were found.',
+          unreadable_source: 'Some files could not be supplied within the audit limits.',
+          provider_reply: 'Copilot did not finish a usable audit report.',
+        };
+        if (limits[audit.reason]) add(row, 'p', limits[audit.reason], 'subtle');
+        if (audit.files_redacted) add(row, 'p', `${audit.files_redacted} files supplied with redactions.`, 'subtle');
+        if (audit.files_skipped) {
+          const skipped = add(row, 'details', '');
+          add(skipped, 'summary', `${audit.files_skipped} eligible files skipped`);
+          for (const file of audit.skipped || []) add(skipped, 'p', `${file.path} · ${file.reason}`);
+        }
+      }
       if (turn.error) add(row, 'p', turn.error, 'turn-error');
       const reviewStatus = {preview: 'Preview only', discarded: 'Draft discarded',
         applied: 'Changes applied', no_draft: 'No changes drafted'}[turn.reviewStatus];
