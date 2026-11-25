@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2 — 2026-11-25
+
+- Show the selected tab, active VS Code link and last verified Copilot reply in the Edge popup.
+- Keep the successful reply visible after the connection test finishes.
+- Wake the local connection check when the toolbar popup opens. Opening a Copilot tab
+  requires a separate click.
+
 ## 0.5.1 — 2026-11-25
 
 - Release the Edge connection promptly when a task stops with an open browser request.

@@ -268,6 +268,8 @@ async def test_toolbar_popup_pairs_and_never_switches_tabs_on_its_own(connected_
     other = await page.context.new_page()
     await other.goto("https://copilot.com/chat?other")
     await page.bring_to_front()
+    tab_count = "async () => (await chrome.tabs.query({})).length"
+    tabs_before_popup = await worker.evaluate(tab_count)
     await worker.evaluate("chrome.action.openPopup()")
     cdp = await page.context.new_cdp_session(page)
     targets = (await cdp.send("Target.getTargets"))["targetInfos"]
@@ -295,7 +297,9 @@ async def test_toolbar_popup_pairs_and_never_switches_tabs_on_its_own(connected_
             cdp.remove_listener("Target.receivedMessageFromTarget", received)
 
     async def evaluate(expression):
-        result = await call("Runtime.evaluate", expression=expression, returnByValue=True)
+        result = await call(
+            "Runtime.evaluate", expression=expression, returnByValue=True, awaitPromise=True
+        )
         return result["result"].get("value")
 
     async def wait_for(expression):
@@ -306,6 +310,26 @@ async def test_toolbar_popup_pairs_and_never_switches_tabs_on_its_own(connected_
         pytest.fail(f"Popup state did not match: {expression}")
 
     try:
+        await wait_for("document.querySelector('#status').textContent === 'Edge linked to VS Code'")
+        assert await worker.evaluate(tab_count) == tabs_before_popup
+        assert await evaluate("document.querySelector('#open').hidden")
+        assert await page.evaluate("window.sentCount") == 0
+        assert "Complete fixture answer" == await provider.send("Fixture probe")
+        assert await provider.record_probe_success()
+        await wait_for("document.querySelector('#status').textContent === 'Copilot reply verified'")
+        await provider.close()
+        await wait_for(
+            "chrome.storage.session.get('connectedSelection')"
+            ".then(state => !state.connectedSelection)"
+        )
+        assert await evaluate(
+            "document.querySelector('#status').textContent === 'Copilot reply verified'"
+        )
+        assert await evaluate(
+            "document.querySelector('#tab-help').textContent.includes('Last successful test')"
+        )
+        await evaluate("document.querySelector('#connect').click()")
+        assert await worker.evaluate(tab_count) == tabs_before_popup
         await wait_for("!document.querySelector('#disconnect').hidden")
         await evaluate("document.querySelector('#disconnect').click()")
         await wait_for("!document.querySelector('#pair-step').hidden")
@@ -321,7 +345,10 @@ async def test_toolbar_popup_pairs_and_never_switches_tabs_on_its_own(connected_
         selected = "async () => (await chrome.storage.session.get('tabId')).tabId"
         assert not await worker.evaluate(selected)
         await evaluate("document.querySelector('#connect').click()")
-        await wait_for("document.querySelector('#status').textContent === 'Tab selected'")
+        await wait_for("document.querySelector('#status').textContent === 'Copilot tab selected'")
+        assert await evaluate(
+            "document.querySelector('#tab-help').textContent.includes('Test connection')"
+        )
         chosen = await worker.evaluate(selected)
         assert isinstance(chosen, int)
     finally:

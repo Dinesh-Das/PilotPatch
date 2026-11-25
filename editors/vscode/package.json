@@ -2,7 +2,7 @@
   "name": "pilotpatch",
   "displayName": "PilotPatch",
   "description": "Chat about your workspace and review changes from Microsoft Copilot Web.",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "publisher": "pilotpatch-local",
   "license": "MIT",
   "repository": {

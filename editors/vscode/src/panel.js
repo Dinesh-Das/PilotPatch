@@ -34,7 +34,7 @@ function renderPanel(webview, extensionUri, Uri) {
   </section>
   <section id="connection" class="setup" aria-labelledby="setup-title" hidden>
     <h2 id="setup-title">Connect Copilot in Edge</h2>
-    <p id="connect-intro">Open Edge Extensions and copy the folder you’ll select there. Already paired? Test your connection.</p>
+    <p id="connect-intro">Already paired in Edge? Test your connection below. For a first install, open Edge Extensions and load the PilotPatch folder.</p>
     <button id="connect" class="primary">Open Edge setup</button>
     <ol class="setup-steps" id="edge-steps" hidden>
       <li>In your intended Edge profile, turn on <strong>Developer mode</strong> at <code>edge://extensions</code> and click <strong>Load unpacked</strong>. In the folder dialog, press <kbd>Ctrl+L</kbd>, paste the path, and press Enter. Click <strong>Select Folder</strong>. For an existing PilotPatch install, click <strong>Reload</strong> on its card.

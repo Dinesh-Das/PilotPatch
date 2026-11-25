@@ -7,7 +7,7 @@ and use of the intended Microsoft Copilot account for your project.
 
 ## Install it
 
-Transfer the `PilotPatch-Office-0.5.1.zip` produced by `build.cmd` through your
+Transfer the `PilotPatch-Office-0.5.2.zip` produced by `build.cmd` through your
 approved route. Extract it to a local folder you can write to, such as
 `%LOCALAPPDATA%\Programs\PilotPatch`. The bundle contains the Python dependency wheels,
 the VSIX and the source build files. Set up a fresh environment and pairing on each laptop.
@@ -28,7 +28,7 @@ For script restrictions, see the [manual setup commands](../setup.md#2-install-t
 | --- | --- |
 | `copilot.cmd --project 'C:\Work\Project' doctor --offline` | Python dependencies, executable Git, project access and Edge installation. |
 | **Open Edge setup** in VS Code | Opens Extensions and copies the folder path. The panel guides installation and pairing in the intended profile. |
-| **Test connection** | Sends a short message with no project files and verifies the full reply on that laptop and account. |
+| **Test connection** | Sends a short message with no project files and verifies the full reply. The Edge popup keeps the last successful result for the selected tab. |
 | A task in an approved disposable repository | Checks source-sharing consent, edits and command approvals under the actual setup. |
 
 If Edge won't enable Developer mode or load the unpacked extension, check

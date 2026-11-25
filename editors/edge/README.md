@@ -14,14 +14,14 @@ browser session.
    if asked. Open **Copilot** in that profile and sign in.
 4. Click **Use this tab**. One open Copilot tab is already highlighted. If several
    are open, choose the one you intend to use.
-5. In VS Code, click **Test connection**, or run `copilot.cmd probe`. Edge can take
-   up to 30 seconds to reconnect. Click **Reconnect** in the popup while the test
-   is running to wake it immediately.
+5. In VS Code, click **Test connection**, or run `copilot.cmd probe`. If VS Code is
+   waiting for Edge, open the PilotPatch toolbar popup to check for the local task.
 
-**Connected to PilotPatch** and the **ON** badge indicate that the local bridge is
-active. A successful connection test confirms Copilot replied. Keep the selected tab
-open and leave its message box empty when starting a task. Confirm the intended tab
-again after an Edge restart. Use **Disconnect this profile** to remove its pairing.
+The toolbar popup stays in the current window and offers **Open Copilot in a new tab**
+if there is no Copilot chat in this profile. **Edge linked to VS Code** and the **ON**
+badge indicate that the local bridge is active. **Copilot reply verified** shows the
+time of the last successful test for the selected tab. It stays visible after the
+test finishes. Confirm the intended tab again after an Edge restart.
 
 Managed Edge may disable **Load unpacked** or block the extension or loopback connection.
 Check your organization's approved installation route.

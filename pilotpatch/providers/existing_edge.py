@@ -3,6 +3,7 @@
 import asyncio
 import secrets
 import time
+from contextlib import suppress
 from pathlib import Path
 
 from pilotpatch.browser.bridge import Bridge, pairing
@@ -28,9 +29,10 @@ class CopilotExistingEdge:
         except TimeoutError as exc:
             await self.close()
             raise ProviderError(
-                "Edge did not connect. Open PilotPatch in the Edge profile you intend to use "
-                "and click Use this tab or Reconnect. If the extension is missing or disabled, "
-                "check edge://extensions. Managed Edge can block unpacked extensions."
+                "Edge did not connect. While Test connection is running, open PilotPatch in "
+                "the Edge profile with your Copilot tab. Choose Use this tab if needed. "
+                "If the toolbar icon is missing, check whether PilotPatch is enabled at "
+                "edge://extensions."
             ) from exc
         except BaseException:
             await self.close()
@@ -39,6 +41,14 @@ class CopilotExistingEdge:
 
     async def close(self):
         await self.bridge.close()  # Only our local transport; never close Edge or its tabs.
+
+    async def record_probe_success(self) -> bool:
+        # Older Edge builds can still run the probe without displaying its receipt.
+        if self.bridge.probe_receipts:
+            with suppress(ProviderError):
+                result = await self.bridge.call("record_probe", {}, wait_seconds=4)
+                return result.get("recorded") is True
+        return False
 
     async def status(self):
         status = await self.bridge.call("status", {"selectors": self.config.selectors.model_dump()})

@@ -299,9 +299,14 @@ async def test_probe_requires_the_current_nonce(tmp_path, monkeypatch, reply, ma
     from pilotpatch import cli
     from pilotpatch.config import Config
 
-    provider = SimpleNamespace(
-        open=AsyncMock(), close=AsyncMock(), send=AsyncMock(return_value=reply)
-    )
+    provider = cli.CopilotExistingEdge(tmp_path, Config())
+    for name, method in (
+        ("open", AsyncMock()),
+        ("close", AsyncMock()),
+        ("send", AsyncMock(return_value=reply)),
+        ("record_probe_success", AsyncMock()),
+    ):
+        monkeypatch.setattr(provider, name, method)
     monkeypatch.setattr(cli, "browser_provider", lambda *_: provider)
     monkeypatch.setattr(secrets, "token_hex", lambda _: "fixture")
     args = SimpleNamespace(home=tmp_path)
@@ -311,6 +316,7 @@ async def test_probe_requires_the_current_nonce(tmp_path, monkeypatch, reply, ma
         with pytest.raises(RuntimeError, match="did not match the probe nonce"):
             await cli._browser_command("probe", args, Config())
     provider.send.assert_awaited_once()
+    assert provider.record_probe_success.await_count == int(matches)
 
 
 def test_connect_packages_assets_and_logout_preserves_profile(tmp_path, monkeypatch):

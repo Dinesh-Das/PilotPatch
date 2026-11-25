@@ -1,6 +1,7 @@
 "use strict";
 const $ = id => document.getElementById(id);
 const tabPatterns = ["copilot.com", "copilot.microsoft.com", "copilot.ai"].map(host => `https://${host}/*`);
+const checkTime = new Intl.DateTimeFormat(undefined, {dateStyle: "medium", timeStyle: "short"});
 let busy = false;
 let renderId = 0;
 let chosenId = "";
@@ -10,14 +11,15 @@ async function render() {
   const id = ++renderId;
   const [{pair, client}, selection, tabs] = await Promise.all([
     chrome.storage.local.get(["pair", "client"]),
-    chrome.storage.session.get(["tabId", "selection", "selectedClient", "connectedSelection"]),
+    chrome.storage.session.get(["tabId", "selection", "selectedClient", "connectedSelection", "verifiedProbe"]),
     chrome.tabs.query({url: tabPatterns})
   ]);
   if (id !== renderId) return;
   if (!pair || client !== profileClient) chosenId = "";
   profileClient = client;
   const eligible = tabs.filter(tab => PilotPatchConnection.isCopilot(tab.url));
-  const selected = eligible.find(tab => tab.id === selection.tabId && selection.selectedClient === client);
+  const selected = selection.selection && selection.selectedClient === client &&
+    eligible.find(tab => tab.id === selection.tabId);
   $("tabs").replaceChildren(new Option("Choose a Copilot tab", ""));
   for (const [index, tab] of eligible.entries()) {
     const host = new URL(tab.url).hostname;
@@ -36,16 +38,21 @@ async function render() {
   $("pair").disabled = busy;
   $("disconnect").disabled = busy;
   const connected = selected && selection.connectedSelection === selection.selection;
+  const verified = selected && selection.verifiedProbe?.selection === selection.selection &&
+    Number.isFinite(selection.verifiedProbe.at);
   $("status").textContent = !pair ? "Waiting for pairing file" :
-    connected ? "Connected to PilotPatch" : selected ? "Tab selected" :
-      eligible.length ? "Choose the tab PilotPatch can use" : "Open Copilot to continue";
-  $("tab-help").textContent = connected ? "You can return to VS Code. Keep this Copilot tab open." :
-    selected ? "In VS Code, click Test connection. Edge may take up to 30 seconds to connect." :
+    verified ? "Copilot reply verified" : connected ? "Edge linked to VS Code" :
+      selected ? "Copilot tab selected" : eligible.length ? "Choose a Copilot tab" :
+        "No Copilot chat open in this profile";
+  $("tab-help").textContent = verified ?
+    `Last successful test: ${checkTime.format(selection.verifiedProbe.at)}. Keep this tab open for PilotPatch.` :
+    connected ? "The local link is working. VS Code shows the result of the Copilot reply test." :
+      selected ? "Click Test connection in the PilotPatch panel in VS Code to verify a Copilot reply." :
       eligible.length === 1 ? `Use ${eligible[0].title || "the open Copilot tab"}, then return to VS Code.` :
         eligible.length ? "Choose the tab signed into the account you want to use." :
-          "Sign in on the Copilot website, then open this extension again.";
+          "Open the Copilot website in this Edge profile and sign in.";
   $("connect").textContent = selected && String(selected.id) === $("tabs").value ?
-    "Reconnect" : "Use this tab";
+    "Check connection" : "Use this tab";
 }
 
 async function update() {
@@ -95,4 +102,5 @@ chrome.tabs.onUpdated.addListener((_, change) => {
 });
 chrome.tabs.onRemoved.addListener(update);
 chrome.storage.onChanged.addListener(update);
+void chrome.runtime.sendMessage({type: "wake"}).catch(() => {});
 void update();

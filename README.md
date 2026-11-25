@@ -61,7 +61,9 @@ When several Copilot tabs are open, choose the intended one. Confirm the tab aga
 after restarting Edge. Keep it open with an empty message box while a task runs.
 
 **Test connection** sends a short random marker and verifies the whole reply without
-sharing project files. The **ON** badge only shows that the local bridge is active.
+sharing project files. The Edge popup shows **Copilot reply verified** and the time
+of the last successful check for the selected tab. The **ON** badge shows when the
+local bridge is active.
 Managed devices may prohibit loading the Edge extension or contacting Copilot.
 [Office laptop setup and acceptance](docs/office-laptop.md)
 

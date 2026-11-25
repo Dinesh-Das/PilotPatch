@@ -16,7 +16,7 @@ $TargetProject = 'C:\Work\YourProject'
 $PilotPatchPython = Join-Path $PilotPatchRoot '.venv\Scripts\python.exe'
 $PilotPatchCli = Join-Path $PilotPatchRoot 'copilot.cmd'
 $PilotPatchState = Join-Path $env:LOCALAPPDATA 'PilotPatch'
-$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.5.1.vsix'
+$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.5.2.vsix'
 ```
 
 ## 2. Install the Python backend
@@ -47,7 +47,7 @@ online pip steps:
 ```powershell
 $PilotPatchWheels = Join-Path $PilotPatchRoot 'wheelhouse'
 & $PilotPatchPython -I -m pip install --no-index --find-links $PilotPatchWheels --only-binary=:all: -r (Join-Path $PilotPatchRoot 'requirements.txt')
-& $PilotPatchPython -I -m pip install --no-index --no-deps (Join-Path $PilotPatchRoot 'dist\pilotpatch-0.5.1-py3-none-any.whl')
+& $PilotPatchPython -I -m pip install --no-index --no-deps (Join-Path $PilotPatchRoot 'dist\pilotpatch-0.5.2-py3-none-any.whl')
 ```
 
 If you installed manually, use **Extensions → … → Install from VSIX…** in VS Code
@@ -85,9 +85,10 @@ In VS Code, click **Test connection**. From the CLI:
 ```
 
 The test sends a short random marker with no project files and checks the reply.
-Edge can take about 30 seconds to reconnect. Click **Reconnect** in the Edge popup
-while the test waits to wake it immediately. If the test fails, follow the terminal
-message. **Check Microsoft sign-in** in the panel or `login` in the CLI diagnoses
+If VS Code is waiting for Edge, open the PilotPatch toolbar popup to check for the
+local task. After a successful test, the popup shows **Copilot reply verified** with
+the time it passed. If the test fails, follow the terminal message.
+**Check Microsoft sign-in** in the panel or `login` in the CLI diagnoses
 account controls. `status` checks chat readiness without submitting a prompt.
 
 ## 5. Chat in VS Code
@@ -321,7 +322,7 @@ tab without submitting a model prompt:
 | `code` or `cursor` is not recognized | Use Install from VSIX in your editor. |
 | Manifest file is missing or unreadable | In **Load unpacked**, choose the `edge-extension` folder printed by Windows setup or copied from the VS Code panel. Edge looks for `manifest.json` directly inside the selected folder. |
 | Existing Edge is not paired | Run `connect`, load the unpacked extension in the current profile, then choose the pairing file and tab. |
-| No existing Edge tab connected | Keep Edge open. Check that the extension is enabled in that profile, choose the tab, click Reconnect while the CLI waits. |
+| No existing Edge tab connected | Keep Edge open in the same profile as the Copilot chat. Open PilotPatch from the toolbar while the test waits and use **Use this tab** if prompted. |
 | Another PilotPatch browser task is active | Finish it or stop that specific task with Ctrl+C; then retry. |
 | Send is disabled during a connection test | Wait for the result or click **Stop connection test**. Your draft stays in the panel. |
 | Copilot is signed in but account controls are unrecognized | Open Copilot's own account menu so its Sign out/account controls are visible, then retry `login` or `status`. |

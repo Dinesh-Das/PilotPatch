@@ -120,10 +120,12 @@ async def test_composer_is_not_proof_of_authentication(local_browser):
 async def test_cancellation_during_generation(local_browser):
     await local_browser.page.evaluate("() => { window.send = () => { window.sentCount++; }; }")
     task = asyncio.create_task(local_browser.send("Cancelled turn"))
-    await asyncio.sleep(0.2)
-    task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await task
+    try:
+        await local_browser.page.wait_for_function("window.sentCount === 1", timeout=3000)
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
     assert local_browser.poisoned is True
 
 

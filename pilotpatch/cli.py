@@ -19,6 +19,7 @@ from pilotpatch.agent.loop import AgentLoop
 from pilotpatch.agent.state import SessionStore
 from pilotpatch.browser.bridge import pairing
 from pilotpatch.config import Config, default_home, load_config
+from pilotpatch.providers.existing_edge import CopilotExistingEdge
 from pilotpatch.providers.factory import browser_provider
 from pilotpatch.security.permissions import Permissions
 from pilotpatch.security.redaction import redact
@@ -372,6 +373,14 @@ async def _browser_command(command, args, config):
                 "Live Copilot communication verified: submitted a nonce and retrieved "
                 "its complete response."
             )
+            if (
+                isinstance(provider, CopilotExistingEdge)
+                and not await provider.record_probe_success()
+            ):
+                ui.event(
+                    "The reply was verified here. If the Edge popup does not show it, "
+                    "update and reload the PilotPatch Edge extension."
+                )
     finally:
         await provider.close()
     return 0

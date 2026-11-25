@@ -2,10 +2,14 @@
 "use strict";
 importScripts("connection.js");
 const driverVersion = 4;
+const connectAlarm = "pilotpatch-connect";
 let running = false;
 let wakeRequested = false;
 let popupAction = Promise.resolve();
-const ready = chrome.storage.local.setAccessLevel({accessLevel: "TRUSTED_CONTEXTS"});
+const ready = Promise.all([
+  chrome.storage.local.setAccessLevel({accessLevel: "TRUSTED_CONTEXTS"}),
+  chrome.storage.session.remove("connectedSelection")
+]);
 
 async function post(pair, auth, path, body) {
   const nonce = PilotPatchConnection.hex(crypto.getRandomValues(new Uint8Array(32)));
@@ -84,7 +88,8 @@ async function pump() {
     );
     if (!pair || !client || client !== selectedClient || !selection || !Number.isInteger(tabId)) return;
     if (!await chrome.tabs.get(tabId).catch(() => null)) return;
-    const identity = {client: `${client}:${selection}`, tab: tabId, protocol: 2, driver: driverVersion};
+    const identity = {client: `${client}:${selection}`, tab: tabId, protocol: 2,
+      driver: driverVersion, probe_receipts: true};
     const auth = {key: await PilotPatchConnection.key(pair.token)};
     const hello = await post(pair, auth, "/hello", {});
     if (hello.protocol !== 2 || hello.driver !== driverVersion) throw new Error("backend_upgrade_required");
@@ -107,6 +112,7 @@ async function pump() {
       await selected();
       const command = await post(pair, auth, "/next", identity);
       if (!connected) {
+        await selected();
         await chrome.action.setBadgeText({text: "ON"});
         await chrome.storage.session.set({connectedSelection: selection});
         connected = true;
@@ -118,10 +124,15 @@ async function pump() {
       let result;
       try {
         await selected();
-        result = {result: await operate(tabId, command, selected, async () => {
-          const grant = await post(pair, auth, "/commit", {...identity, id: command.id});
-          if (grant.authorized !== true) throw new Error("commit_not_authorized");
-        })};
+        if (command.action === "record_probe") {
+          await chrome.storage.session.set({verifiedProbe: {selection, at: Date.now()}});
+          result = {result: {recorded: true}};
+        } else {
+          result = {result: await operate(tabId, command, selected, async () => {
+            const grant = await post(pair, auth, "/commit", {...identity, id: command.id});
+            if (grant.authorized !== true) throw new Error("commit_not_authorized");
+          })};
+        }
       } catch (error) {
         const codes = new Set(["composer_has_draft", "send_control_not_unique", "send_disabled",
           "unsent_draft_cleared",
@@ -146,16 +157,10 @@ async function pump() {
   }
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.alarms.create("pilotpatch-connect", {periodInMinutes: 0.5});
-  void pump();
-});
-chrome.runtime.onStartup.addListener(() => {
-  chrome.alarms.create("pilotpatch-connect", {periodInMinutes: 0.5});
-  void pump();
-});
+chrome.runtime.onInstalled.addListener(() => void pump());
+chrome.runtime.onStartup.addListener(() => void pump());
 chrome.alarms.onAlarm.addListener(alarm => {
-  if (alarm.name === "pilotpatch-connect") void pump();
+  if (alarm.name === connectAlarm) void pump();
 });
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
   // A content script or website must never reconfigure pairing or select a tab.
@@ -185,6 +190,8 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
     } else if (message?.type === "disconnect") {
       await chrome.storage.session.clear();
       await chrome.storage.local.remove(["pair", "client", "tabId"]);
+    } else if (message?.type === "wake") {
+      void pump();
     } else {
       throw new Error("Unknown PilotPatch action.");
     }
@@ -195,4 +202,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "session" && changes.selection) { wakeRequested = running; void pump(); }
 });
 void chrome.action.setBadgeText({text: ""});
+void chrome.alarms.get(connectAlarm).then(alarm => {
+  if (!alarm) return chrome.alarms.create(connectAlarm, {periodInMinutes: 0.5});
+});
 void pump();

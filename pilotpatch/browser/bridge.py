@@ -67,6 +67,7 @@ class Bridge:
         self.server = None
         self.handlers: dict[asyncio.Task, asyncio.StreamWriter] = {}
         self.connected = asyncio.Event()
+        self.probe_receipts = False
         self.identity = None
         self.connection_error = None
         self.pending = None
@@ -86,6 +87,7 @@ class Bridge:
             ) from exc
         try:
             self.connected.clear()
+            self.probe_receipts = False
             self.identity = None
             self.connection_error = None
             self.session = secrets.token_hex(32)
@@ -124,7 +126,7 @@ class Bridge:
             self.lock.release()
 
     async def call(self, action: str, payload: dict, *, wait_seconds=15):
-        if action not in {"status", "submit", "response"}:
+        if action not in {"status", "submit", "response", "record_probe"}:
             raise ValueError("Unsupported browser action")
         if self.server is None:
             raise ProviderError("The Edge bridge is closed.")
@@ -160,6 +162,8 @@ class Bridge:
         if self.identity is not None and self.identity != identity:
             return 409, {"error": "different_selected_tab_or_profile"}
         if path == "/next":
+            if self.identity is None:
+                self.probe_receipts = data.get("probe_receipts") is True
             self.identity = identity
             self.connected.set()
             if self.pending and not self.pending["delivered"]:
