@@ -141,6 +141,7 @@ class FileTools:
                 raise ValueError("File contains redacted credential patterns; rename it manually")
             self.repo.stage(destination, None, before)
             self.repo.stage(name, before, None)
+            self.repo.link_rename(source, target)
             return dict(path=name, destination=destination, applied=False, staged=True)
         self.preview(f"Rename {name} -> {destination}")
         if self.dry_run:

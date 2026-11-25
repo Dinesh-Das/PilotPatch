@@ -7,6 +7,7 @@ from pilotpatch.config import Config
 from pilotpatch.security.permissions import Permissions
 from pilotpatch.tools.filesystem import FileTools
 from pilotpatch.tools.repository import Repository
+from pilotpatch.tools.review import ReviewRepository
 
 
 def digest(text):
@@ -91,6 +92,21 @@ def test_delete_and_rename_always_require_approval(tmp_path):
     with pytest.raises(PermissionError):
         fs.rename("a", "b", digest("old"))
     assert (fs.repo.root / "a").exists()
+
+
+def test_staged_rename_links_only_the_visible_final_paths(tmp_path):
+    fs = tools(tmp_path)
+    (fs.repo.root / "original.py").write_text("value = 1", encoding="utf-8")
+    draft = ReviewRepository(fs.repo)
+    fs.repo = draft
+    fs.rename("original.py", "temporary.py", digest("value = 1"))
+    fs.rename("temporary.py", "final.py", digest("value = 1"))
+    fs.write("unrelated.py", "pass", None)
+    changes = sorted(draft.changes.values(), key=lambda item: item.name)
+    assert [item.name for item in changes] == ["final.py", "original.py", "unrelated.py"]
+    assert draft.review_groups(changes) == {0: 0, 1: 0}
+    assert changes[0].review_entry(0, 12000, 0)["added"] == 1
+    assert changes[1].review_entry(1, 12000, 0)["removed"] == 1
 
 
 def test_unified_patch_context_and_no_newline(tmp_path):

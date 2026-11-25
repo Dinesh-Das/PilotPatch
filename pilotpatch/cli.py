@@ -28,7 +28,7 @@ from pilotpatch.tools.command_runner import CommandRunner
 from pilotpatch.tools.filesystem import FileTools
 from pilotpatch.tools.registry import ToolRegistry
 from pilotpatch.tools.repository import Repository
-from pilotpatch.tools.review import ReviewRepository
+from pilotpatch.tools.review import ReviewRepository, review_entries
 from pilotpatch.ui import terminal as ui
 from pilotpatch.ui.editor import EditorConsole
 
@@ -138,24 +138,36 @@ async def _task(args, config, store, state, *, resume=False, output=ui, conversa
         if not changes:
             return {}
         names = [item.name for item in changes]
-        diff = "".join(item.diff() for item in changes)
         if state["dry_run"]:
-            output.preview(diff)
-            return dict(proposed_files=names, review_status="preview")
+            if not output.supports_file_review:
+                output.preview("".join(item.diff() for item in changes))
+                return dict(proposed_files=names, review_status="preview")
+            return dict(
+                proposed_files=names,
+                review_status="preview",
+                review_files=review_entries(changes, review_repo.review_groups(changes)),
+            )
         state["status"] = "awaiting_review"
         store.save(state)
-        output.preview(diff)
-        if not output.confirm(
-            f"{summary}\n\nApply {len(names)} proposed file changes to your project?",
-            review=True,
-        ):
+        if output.supports_file_review:
+            selected = output.review_files(summary, changes, review_repo.review_groups(changes))
+            changes = [change for index, change in enumerate(changes) if index in selected]
+        else:
+            output.preview("".join(item.diff() for item in changes))
+            if not output.confirm(
+                f"{summary}\n\nApply {len(names)} proposed file changes to your project?",
+                review=True,
+            ):
+                changes = []
+        if not changes:
             store.audit(state, "review_declined", file_count=len(names))
             return dict(proposed_files=names, review_status="discarded")
-        store.audit(state, "review_approved", file_count=len(names))
+        store.audit(state, "review_approved", file_count=len(changes))
         for change in changes:
             if repo.existing(change.name) != change.before:
                 raise ValueError(
-                    f"{change.name} changed during review. The proposed changes were not applied."
+                    f"{change.name} changed during review. Start a new review with the latest "
+                    "files."
                 )
         target = FileTools(repo, session_dir, permissions)
         output.event("Applying the approved changes…")
@@ -171,7 +183,8 @@ async def _task(args, config, store, state, *, resume=False, output=ui, conversa
             state["pending"] = None
             store.save(state)
             await asyncio.sleep(0)
-        return dict(proposed_files=names, review_status="applied")
+        status = "applied" if len(changes) == len(names) else "partially_applied"
+        return dict(proposed_files=names, review_status=status)
 
     try:
         with lock:

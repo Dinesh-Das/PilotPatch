@@ -16,7 +16,7 @@ $TargetProject = 'C:\Work\YourProject'
 $PilotPatchPython = Join-Path $PilotPatchRoot '.venv\Scripts\python.exe'
 $PilotPatchCli = Join-Path $PilotPatchRoot 'copilot.cmd'
 $PilotPatchState = Join-Path $env:LOCALAPPDATA 'PilotPatch'
-$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.4.2.vsix'
+$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.5.0.vsix'
 ```
 
 ## 2. Install the Python backend
@@ -47,7 +47,7 @@ online pip steps:
 ```powershell
 $PilotPatchWheels = Join-Path $PilotPatchRoot 'wheelhouse'
 & $PilotPatchPython -I -m pip install --no-index --find-links $PilotPatchWheels --only-binary=:all: -r (Join-Path $PilotPatchRoot 'requirements.txt')
-& $PilotPatchPython -I -m pip install --no-index --no-deps (Join-Path $PilotPatchRoot 'dist\pilotpatch-0.4.2-py3-none-any.whl')
+& $PilotPatchPython -I -m pip install --no-index --no-deps (Join-Path $PilotPatchRoot 'dist\pilotpatch-0.5.0-py3-none-any.whl')
 ```
 
 If you installed manually, use **Extensions → … → Install from VSIX…** in VS Code
@@ -95,8 +95,9 @@ account controls. `status` checks chat readiness without submitting a prompt.
 When connection testing succeeds, ask a question or request a change. Click **Send**
 or press **Ctrl+Enter**, then click **Share and send** if authorized. Read replies and
 review proposed edits and commands in the sidebar. The default **Review and apply**
-mode works through repository reads and drafts automatically. Click **Apply changes**
-to write the reviewed diff. **Preview only** shows the diff for inspection.
+mode works through repository reads and drafts automatically. Expand files in the
+review to see highlighted edits or select **Open diff** for the full comparison.
+The **Apply** button writes the selected files. **Preview only** shows the proposed diffs.
 **Troubleshooting** contains **Check this laptop** and setup recovery.
 
 For Cursor and compatible local desktop forks, run the setup command without

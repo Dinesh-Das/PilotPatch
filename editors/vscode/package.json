@@ -2,7 +2,7 @@
   "name": "pilotpatch",
   "displayName": "PilotPatch",
   "description": "Chat about your workspace and review changes from Microsoft Copilot Web.",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "publisher": "pilotpatch-local",
   "license": "MIT",
   "repository": {
@@ -47,7 +47,7 @@
   },
   "scripts": {"test": "node --test test/*.test.js"},
   "files": [
-    "src/chat.js", "src/controller.js", "src/extension.js", "src/panel.js", "src/request.js",
+    "src/chat.js", "src/controller.js", "src/extension.js", "src/panel.js", "src/request.js", "src/review-diff.js",
     "media/panel.css", "media/panel.js", "media/pilotpatch.svg", "README.md", "LICENSE"
   ],
   "devDependencies": {}

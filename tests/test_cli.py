@@ -65,7 +65,8 @@ def test_editor_registration_and_literal_prompt(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "decision", ["decline-source", "decline-edit", "approve-edit", "preview", "stop", "stale"]
+    "decision",
+    ["decline-source", "decline-edit", "approve-edit", "preview", "stop", "stale", "select-files"],
 )
 async def test_editor_chat_pipe_only_applies_an_approved_edit(tmp_path, decision):
     # All I/O is real except the Copilot provider, which is replaced only in this test process.
@@ -131,7 +132,10 @@ cli.main()
         await child.stdin.drain()
 
     try:
-        await send(dict(prompt="Add the answer", conversation=[]))
+        request = dict(prompt="Add the answer", conversation=[])
+        if decision == "select-files":
+            request["review_ui"] = True
+        await send(request)
         source = await read("approval")
         assert source["source"] is True
         await send(dict(id=source["id"], approved=decision != "decline-source"))
@@ -148,8 +152,15 @@ cli.main()
             edit = await read("approval")
             assert edit["source"] is False
             assert edit["review"] is True
-            assert "+answer = 43" in edit["diff"]
-            assert "+answer = 42" not in edit["diff"]
+            if decision == "select-files":
+                answer_file, details_file = edit["files"]
+                assert answer_file["path"] == "answer.py"
+                assert details_file["path"] == "details.txt"
+                assert "+answer = 43" in answer_file["diff"]
+                assert "+answer = 42" not in answer_file["diff"]
+            else:
+                assert "+answer = 43" in edit["diff"]
+                assert "+answer = 42" not in edit["diff"]
             assert not (project / "answer.py").exists()
             assert not (project / "details.txt").exists()
             # A duplicate source-sharing acknowledgement cannot approve a file edit.
@@ -165,6 +176,19 @@ cli.main()
                 error = await read("error")
                 assert "changed during review" in error["message"]
                 assert (project / "details.txt").read_text() == "User changes"
+            elif decision == "select-files":
+                await send(dict(id=edit["id"], open_file=answer_file["id"]))
+                snapshot = await read("review_document")
+                assert snapshot["before"] == ""
+                assert snapshot["after"] == "answer = 43\n"
+                await send(dict(id=edit["id"], selected=[9999]))
+                assert (await read("review_error"))["id"] == edit["id"]
+                assert not (project / "answer.py").exists()
+                await send(dict(id=edit["id"], selected=[answer_file["id"]]))
+                answer = await read("reply")
+                assert answer["result"]["files_changed"] == ["answer.py"]
+                assert answer["result"]["review_status"] == "partially_applied"
+                assert not (project / "details.txt").exists()
             else:
                 await send(dict(id=edit["id"], approved=decision == "approve-edit"))
                 answer = await read("reply")
@@ -176,7 +200,7 @@ cli.main()
         assert await asyncio.wait_for(child.wait(), timeout=10) == {"stop": 130, "stale": 1}.get(
             decision, 0
         )
-        assert (project / "answer.py").exists() is (decision == "approve-edit")
+        assert (project / "answer.py").exists() is (decision in {"approve-edit", "select-files"})
     finally:
         child.stdin.close()
         if child.returncode is None:

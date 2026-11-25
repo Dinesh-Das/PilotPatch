@@ -42,10 +42,37 @@ function fixture(overrides = {}) {
     chats.push(chat);
     return {decide: value => decisions.push(value), stop: () => {chat.stopped = true;}};
   };
-  const controller = new Controller(api, state => updates.push(state), overrides.home || '', startChat);
+  const controller = new Controller(api, state => updates.push(state), overrides.home || '', startChat,
+    overrides.openReviewDiff);
   return {controller, api, updates, tasks, chats, listeners, terminated: () => terminated};
 }
 const chat = {type: 'chat', prompt: 'Explain the controls', mode: 'approve', dryRun: false};
+
+test('opens only requested snapshots and applies a validated selection', async () => {
+  const opened = [];
+  const f = fixture({openReviewDiff: async (...args) => {opened.push(args);}});
+  await f.controller.handle(chat);
+  const first = f.chats[0], id = '1'.repeat(32);
+  const a = {id: 0, path: 'app.py'}, b = {id: 1, group: 1, path: 'old.py'};
+  const c = {id: 2, group: 1, path: 'new.py'};
+  first.message({type: 'approval', id, message: 'Review', review: true, files: [a, b, c]});
+  const snapshot = {type: 'review_document', id, file: 0, before: 'old', after: 'new'};
+  first.message(snapshot);
+  assert.deepEqual(opened, []);
+  await f.controller.handle({type: 'review-open', id, file: 0});
+  first.message(snapshot);
+  assert.deepEqual(opened, [[id, a, snapshot]]);
+  await f.controller.handle({type: 'decision', id, approved: true});
+  await f.controller.handle({type: 'review-apply', id, files: [1]});
+  assert.match(f.updates.at(-1).error, /linked rename/);
+  const folder = f.controller.currentFolder().uri.fsPath;
+  f.api.workspace.textDocuments = [{isDirty: true, uri: {scheme: 'file', fsPath: path.join(folder, a.path)}}];
+  await f.controller.handle({type: 'review-apply', id, files: [0]});
+  assert.match(f.updates.at(-1).error, /unsaved edits in app.py/);
+  f.api.workspace.textDocuments = [];
+  await f.controller.handle({type: 'review-apply', id, files: [0]});
+  assert.deepEqual(first.decisions, [{id, open_file: 0}, {id, selected: [0]}]);
+});
 
 test('chat accepts only the current approval and includes the last answer in a follow-up', async () => {
   const f = fixture();

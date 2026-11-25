@@ -2,11 +2,14 @@
 const vscode = require('vscode');
 const {Controller} = require('./controller');
 const {renderPanel} = require('./panel');
+const {createReviewDiffs} = require('./review-diff');
 
 function activate(context) {
   let view;
-  const controller = new Controller(vscode, state => view?.webview.postMessage({type: 'state', ...state}));
-  context.subscriptions.push(controller);
+  const diffs = createReviewDiffs(vscode);
+  const controller = new Controller(vscode, state => view?.webview.postMessage({type: 'state', ...state}),
+    undefined, undefined, diffs.show);
+  context.subscriptions.push(controller, diffs);
   context.subscriptions.push(vscode.window.registerWebviewViewProvider('pilotpatch.promptView', {
     resolveWebviewView(resolved) {
       view = resolved;

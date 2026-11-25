@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 — 2026-11-25
+
+- Review draft edits by file with line numbers and highlighted additions and removals.
+- Open the original and proposed text in VS Code’s native diff editor.
+- Apply selected files, keep rename paths linked, and check for unsaved editor changes
+  before writing the selected draft.
+
 ## 0.4.2 — 2026-11-25
 
 - Run codebase audits as read-only, multi-turn reviews with automatic source,

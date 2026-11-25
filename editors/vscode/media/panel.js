@@ -9,6 +9,7 @@
   let submitted;
   let previousChat = '';
   let previousApproval;
+  let selectedFiles = new Set();
   const draft = api.getState();
   if (draft && typeof draft.prompt === 'string') prompt.value = draft.prompt.slice(0, 16000);
   if (draft && ['approve', 'read-only', 'auto-edit'].includes(draft.mode)) mode.value = draft.mode;
@@ -27,7 +28,8 @@
       mode.value === 'auto-edit' ? 'File edits apply automatically. Commands still need approval.' :
       'PilotPatch prepares the edits and presents one review before applying them.';
     api.setState({prompt: prompt.value, mode: mode.value, dryRun: dryRun.checked,
-      project: state.project || draft?.project});
+      project: state.project || draft?.project, review: state.approval?.files ?
+        {id: state.approval.id, selected: [...selectedFiles]} : undefined});
   }
   function send(type) { api.postMessage({type}); }
   function submit(event) {
@@ -85,6 +87,97 @@
     }
   }
 
+  function highlightDiff(parent, diff) {
+    let before, after, hunk = false;
+    for (const line of diff.split(/\r\n|\r|\n/)) {
+      if (!line && !hunk) continue;
+      const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+      if (match) {
+        [before, after] = match.slice(1).map(Number);
+        hunk = true;
+      }
+      if (!line && hunk) continue;
+      const added = hunk && line.startsWith('+');
+      const removed = hunk && line.startsWith('-');
+      const context = hunk && line.startsWith(' ');
+      const row = add(parent, 'div', '', `diff-row ${added ? 'diff-added' : removed ?
+        'diff-removed' : context ? 'diff-context' : 'diff-header'}`);
+      for (const number of [removed || context ? before++ : '', added || context ? after++ : '']) {
+        add(row, 'span', number, 'diff-number').setAttribute('aria-hidden', 'true');
+      }
+      add(row, 'code', line);
+    }
+  }
+
+  function renderReviewFiles(parent, files, approvalId) {
+    parent.replaceChildren();
+    for (const [index, file] of files.entries()) {
+      const card = add(parent, 'div', '', 'review-file');
+      if (approvalId) {
+        const box = add(card, 'input', '', 'review-include');
+        box.type = 'checkbox';
+        box.dataset.file = String(file.id);
+        box.setAttribute('aria-label', `Include ${file.path}`);
+        box.addEventListener('change', () => {
+          for (const item of files) {
+            if (item.id === file.id || (file.group != null && item.group === file.group)) {
+              if (box.checked) selectedFiles.add(item.id);
+              else selectedFiles.delete(item.id);
+            }
+          }
+          renderSelection();
+          renderDraft();
+        });
+      }
+      const details = add(card, 'details', '');
+      const header = add(details, 'summary', '', 'review-file-header');
+      add(header, 'span', file.path, 'review-path');
+      const stats = add(header, 'span', '', 'review-stats');
+      const kinds = {added: 'Added', modified: 'Modified', deleted: 'Deleted'};
+      add(stats, 'span', file.group == null ? kinds[file.kind] : 'Linked rename', 'review-kind');
+      if (file.added) add(stats, 'span', `+${file.added}`, 'review-added');
+      if (file.removed) add(stats, 'span', `−${file.removed}`, 'review-removed');
+      if (approvalId) {
+        const button = add(details, 'button', 'Open diff', 'text-button review-open');
+        button.type = 'button';
+        button.setAttribute('aria-label', `Open diff for ${file.path}`);
+        button.addEventListener('click', () =>
+          api.postMessage({type: 'review-open', id: approvalId, file: file.id}));
+      }
+      const diff = add(details, 'div', '', 'review-diff');
+      diff.tabIndex = 0;
+      diff.setAttribute('role', 'region');
+      diff.setAttribute('aria-label', `Changes in ${file.path}`);
+      function showLines() {
+        if (details.open && !diff.childElementCount) {
+          highlightDiff(diff, file.diff);
+          if (file.clipped) add(diff, 'p', approvalId ? 'Open diff to review the remaining lines.' :
+            'Inline preview clipped.', 'subtle review-clip');
+        }
+      }
+      details.addEventListener('toggle', showLines);
+      if (index === 0 && approvalId) {
+        details.open = true;
+        showLines();
+      }
+    }
+  }
+
+  function renderSelection() {
+    const files = state.approval?.files;
+    if (!files) return;
+    const size = selectedFiles.size;
+    const all = element('review-all');
+    all.checked = size === files.length;
+    all.indeterminate = size > 0 && size < files.length;
+    element('review-count').textContent = `${size} of ${files.length} selected`;
+    element('approve').textContent = `Apply ${size} ${size === 1 ? 'file' : 'files'}`;
+    element('approve').disabled = size === 0;
+    for (const box of element('review-files').querySelectorAll('input[data-file]')) {
+      box.checked = selectedFiles.has(Number(box.dataset.file));
+    }
+  }
+
   function renderChat(chat, canRun) {
     const log = element('messages'), scroll = log.closest('main');
     element('conversation').hidden = !canRun || !chat.length;
@@ -122,15 +215,23 @@
       }
       if (turn.error) add(row, 'p', turn.error, 'turn-error');
       const reviewStatus = {preview: 'Preview only', discarded: 'Draft discarded',
-        applied: 'Changes applied', no_draft: 'No changes drafted'}[turn.reviewStatus];
+        applied: 'Changes applied', partially_applied: 'Selected changes applied',
+        no_draft: 'No changes drafted'}[turn.reviewStatus];
       if (reviewStatus) add(row, 'p', reviewStatus, 'review-status');
       if (turn.files?.length || turn.proposed?.length || turn.checks?.length || turn.notes?.length || turn.previews?.length || turn.dryRun) {
         const details = add(row, 'details', '');
         add(details, 'summary', turn.dryRun ? 'Preview and details' : 'Changes and details');
         for (const file of turn.files || []) add(details, 'p', `Changed ${file}`);
-        if (turn.reviewStatus === 'preview') {
+        if (turn.reviewStatus === 'preview' && !turn.reviewFiles) {
           for (const file of turn.proposed || []) add(details, 'p', `Proposed ${file}`);
         }
+        if (turn.reviewStatus === 'partially_applied') {
+          const applied = new Set(turn.files);
+          for (const file of turn.proposed || []) {
+            if (!applied.has(file)) add(details, 'p', `Skipped ${file}`);
+          }
+        }
+        if (turn.reviewFiles) renderReviewFiles(add(details, 'div', '', 'preview-files'), turn.reviewFiles);
         for (const check of turn.checks || []) {
           const status = check.timed_out ? 'Timed out' : `Exit ${check.exit_code}`;
           add(details, 'p', `${status} · ${check.argv.join(' ')}`);
@@ -145,6 +246,7 @@
 
   function renderApproval(approval, allowed) {
     element('approval').hidden = !allowed || !approval;
+    element('file-review').hidden = !approval?.files;
     element('approval-title').textContent = approval?.source ? 'Share with Microsoft Copilot Web' :
       approval?.review ? 'Review changes' : 'Review proposed action';
     element('approval-message').textContent = approval?.message || '';
@@ -154,18 +256,36 @@
     element('decline').textContent = approval?.review ? 'Discard draft' : 'Decline';
     for (const id of ['approve', 'decline']) element(id).disabled = !approval;
     if (allowed && approval && approval.id !== previousApproval) {
+      if (approval.files) {
+        const saved = draft?.review?.id === approval.id ? draft.review.selected : null;
+        selectedFiles = new Set(approval.files.map(file => file.id).filter(id => !saved || saved.includes(id)));
+        renderReviewFiles(element('review-files'), approval.files, approval.id);
+      } else {
+        element('review-files').replaceChildren();
+      }
       element('approval').scrollIntoView({block: 'nearest'});
     }
+    if (approval?.files) renderSelection();
     previousApproval = approval?.id;
   }
 
   function decide(approved) {
     if (!state.approval) return;
-    api.postMessage({type: 'decision', id: state.approval.id, approved});
+    if (approved && state.approval.files) {
+      if (!selectedFiles.size) return;
+      api.postMessage({type: 'review-apply', id: state.approval.id, files: [...selectedFiles]});
+    } else {
+      api.postMessage({type: 'decision', id: state.approval.id, approved});
+    }
     element('approve').disabled = element('decline').disabled = true;
   }
   element('approve').addEventListener('click', () => decide(true));
   element('decline').addEventListener('click', () => decide(false));
+  element('review-all').addEventListener('change', event => {
+    selectedFiles = new Set(event.currentTarget.checked ? state.approval.files.map(file => file.id) : []);
+    renderSelection();
+    renderDraft();
+  });
   element('task-form').addEventListener('submit', submit);
   prompt.addEventListener('keydown', event => {
     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') submit(event);

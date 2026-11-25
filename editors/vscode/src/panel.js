@@ -58,6 +58,12 @@ function renderPanel(webview, extensionUri, Uri) {
   <section id="approval" class="approval" aria-labelledby="approval-title" hidden>
     <h2 id="approval-title"></h2><p id="approval-message"></p>
     <pre id="approval-diff" aria-label="Proposed change" tabindex="0" hidden></pre>
+    <div id="file-review" hidden>
+      <label class="review-selection"><input id="review-all" type="checkbox"> All files
+        <span id="review-count" aria-live="polite"></span>
+      </label>
+      <div id="review-files" aria-label="Proposed files"></div>
+    </div>
     <div class="approval-actions"><button id="approve" type="button" class="primary">Approve</button>
       <button id="decline" type="button" class="secondary">Decline</button></div>
   </section>

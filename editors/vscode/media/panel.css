@@ -71,5 +71,25 @@ input[type="checkbox"] { margin: 0; accent-color: var(--link); }
 .approval p { white-space: pre-wrap; }
 .approval-actions { position: sticky; bottom: 0; padding: 5px 0; background: var(--vscode-sideBar-background, #181818); }
 .approval-actions .primary { width: auto; }
+.review-selection { display: flex; align-items: center; gap: 7px; margin: 12px 0 7px; }
+#review-count { margin-inline-start: auto; color: var(--muted); font-size: 11px; }
+#review-files, .preview-files { display: grid; gap: 6px; }
+.review-file { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; }
+.review-file > details { min-width: 0; flex: 1; }
+.review-file > .review-include { flex: 0 0 auto; margin-top: 4px; }
+.review-file-header { padding: 1px 0; }
+.review-path { font-family: var(--vscode-editor-font-family, monospace); font-size: 12px; }
+.review-stats { display: flex; flex-wrap: wrap; gap: 6px; padding-inline-start: 12px; font-size: 11px; }
+.review-kind, .diff-number, .diff-header { color: var(--muted); }
+.review-added { color: var(--vscode-gitDecoration-addedResourceForeground, #8ed9a8); }
+.review-removed { color: var(--vscode-gitDecoration-deletedResourceForeground, #f9a099); }
+.review-open { margin: 6px 0; min-height: 24px; font-size: 12px; }
+.review-diff { overflow: auto; max-height: 14rem; margin-top: 4px; background: var(--vscode-editor-background, #191919); }
+.diff-row { display: grid; grid-template-columns: 3ch 3ch auto; gap: 4px; min-width: 100%; width: max-content; padding: 0 4px; font: 11px/1.6 var(--vscode-editor-font-family, monospace); }
+.diff-number { text-align: end; user-select: none; }
+.diff-row code { white-space: pre; font: inherit; }
+.diff-added { background: var(--vscode-diffEditor-insertedLineBackground, #244333); }
+.diff-removed { background: var(--vscode-diffEditor-removedLineBackground, #4c2a2e); }
+.review-clip { margin: 6px; }
 pre { font: var(--vscode-editor-font-size, 12px)/1.4 var(--vscode-editor-font-family, monospace); white-space: pre; overflow: auto; max-height: 40vh; padding: 8px; background: var(--vscode-textCodeBlock-background, #222); }
 @media (min-width: 600px) { body { max-width: 680px; padding: 24px; margin: auto; } }

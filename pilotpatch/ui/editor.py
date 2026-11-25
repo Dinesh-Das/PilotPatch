@@ -12,6 +12,7 @@ from pydantic import Field
 
 from pilotpatch.agent.protocol import StrictModel
 from pilotpatch.security.redaction import redact_value
+from pilotpatch.tools.review import Change, review_entries
 
 
 class Exchange(StrictModel):
@@ -23,6 +24,7 @@ class Exchange(StrictModel):
 class ChatRequest(StrictModel):
     prompt: str = Field(min_length=1, max_length=16000)
     conversation: list[Exchange] = Field(max_length=8)
+    review_ui: bool = False
 
 
 class EditorConsole:
@@ -31,6 +33,7 @@ class EditorConsole:
         self.diff = None
         self.decisions = Queue()
         self.cancelled_in_confirmation = False
+        self.supports_file_review = False
 
     def start(self) -> ChatRequest:
         # The daemon owns this duplicate after the first read. It can wait on
@@ -43,6 +46,7 @@ class EditorConsole:
             request = ChatRequest.model_validate_json(line)
             if not request.prompt.strip() or "\0" in request.prompt:
                 raise ValueError("Enter a message before sending")
+            self.supports_file_review = request.review_ui
         except BaseException:
             stream.close()
             raise
@@ -56,15 +60,13 @@ class EditorConsole:
         def read_decisions():
             try:
                 with stream:
-                    while line := stream.readline(1024):
-                        message = json.loads(line)
-                        if (
-                            not isinstance(message, dict)
-                            or not isinstance(message.get("id"), str)
-                            or type(message.get("approved")) is not bool
-                        ):
+                    while line := stream.readline(8193):
+                        if len(line) > 8192 or not line.endswith(b"\n"):
                             break
-                        self.decisions.put((message["id"], message["approved"]))
+                        message = json.loads(line)
+                        if not isinstance(message, dict) or not isinstance(message.get("id"), str):
+                            break
+                        self.decisions.put(message)
             except (ValueError, OSError):
                 pass
             finally:
@@ -101,10 +103,56 @@ class EditorConsole:
         self.emit(
             "approval", id=identifier, message=message, diff=diff, source=source, review=review
         )
+        for decision in self._messages(identifier):
+            if set(decision) == {"id", "approved"} and type(decision["approved"]) is bool:
+                return decision["approved"]
+
+    def review_files(self, message: str, changes: list[Change], groups: dict[int, int]) -> set[int]:
+        identifier = uuid4().hex
+        files = review_entries(changes, groups)
+        self.emit(
+            "approval", id=identifier, message=message, source=False, review=True, files=files
+        )
+        indices = set(range(len(changes)))
+        for decision in self._messages(identifier):
+            if set(decision) == {"id", "approved"} and decision["approved"] is False:
+                return set()
+            if set(decision) == {"id", "open_file"}:
+                index = decision["open_file"]
+                if type(index) is int and index in indices:
+                    change = changes[index]
+                    self.emit(
+                        "review_document",
+                        id=identifier,
+                        file=index,
+                        before=(change.before or b"").decode("utf-8-sig"),
+                        after=(change.after or b"").decode("utf-8-sig"),
+                    )
+                    continue
+            if set(decision) == {"id", "selected"}:
+                selection = decision["selected"]
+                if (
+                    isinstance(selection, list)
+                    and 0 < len(selection) <= len(changes)
+                    and all(type(index) is int and index in indices for index in selection)
+                ):
+                    selected = set(selection)
+                    if all(
+                        (index in selected) == (group in selected)
+                        for index, group in groups.items()
+                    ):
+                        return selected
+            self.emit(
+                "review_error",
+                id=identifier,
+                message="Select valid files and keep linked renames together.",
+            )
+
+    def _messages(self, identifier: str):
         while True:
             decision = self.decisions.get()
             if decision is None:
                 self.cancelled_in_confirmation = True
                 raise asyncio.CancelledError
-            if decision[0] == identifier:
-                return decision[1]
+            if decision["id"] == identifier:
+                yield decision

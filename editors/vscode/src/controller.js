@@ -12,7 +12,8 @@ const execute = promisify(execFile);
 
 class Controller {
   constructor(vscode, notify, home = path.join(process.env.LOCALAPPDATA ||
-    path.join(os.homedir(), '.local', 'share'), 'PilotPatch'), launchChat = startChat) {
+    path.join(os.homedir(), '.local', 'share'), 'PilotPatch'), launchChat = startChat,
+    openReviewDiff) {
     this.vscode = vscode;
     this.notify = notify;
     this.home = home;
@@ -20,6 +21,7 @@ class Controller {
     this.active = undefined;
     this.chats = new Map();
     this.launchChat = launchChat;
+    this.openReviewDiff = openReviewDiff;
     this.state = {phase: 'idle', message: '', busy: false, prepared: false, verified: false, activity: []};
     this.disposables = [
       vscode.tasks.onDidStartTaskProcess(event => this.started(event)),
@@ -113,6 +115,7 @@ class Controller {
       const request = parseRequest(input);
       if (request.type === 'ready') return this.publish();
       if (request.type === 'decision') return this.decide(request);
+      if (request.type === 'review-open' || request.type === 'review-apply') return this.review(request);
       if (request.type === 'clear-chat') {
         if (this.state.busy) throw new Error('Stop the current operation before clearing the conversation.');
         this.chats.delete(this.currentFolder()?.uri.toString());
@@ -208,9 +211,9 @@ class Controller {
       user: turn.user, assistant: turn.reply, changed_files: turn.files,
     }));
     // The protocol's first line is at most one MiB, including JSON escapes.
-    const payload = {prompt: request.prompt, conversation};
+    const payload = {prompt: request.prompt, conversation, review_ui: true};
     while (conversation.length && Buffer.byteLength(JSON.stringify(payload)) > 1000000) conversation.shift();
-    const active = {type: 'chat', key, chat, user: request.prompt};
+    const active = {type: 'chat', key, chat, user: request.prompt, openDiffs: new Set()};
     this.active = active;
     active.transport = this.launchChat(invocation, payload,
       message => this.chatMessage(active, message),
@@ -218,13 +221,47 @@ class Controller {
     this.publish();
   }
 
-  decide({id, approved}) {
+  currentApproval(id) {
     const active = this.active;
     if (!active?.approval || active.approval.id !== id || active.stopping ||
         active.key !== this.currentFolder()?.uri.toString() || !this.vscode.workspace.isTrusted) return;
+    return active;
+  }
+
+  decide({id, approved}) {
+    const active = this.currentApproval(id);
+    if (!active || (approved && active.approval.files)) return;
     active.approval = undefined;
     active.transport.decide({id, approved});
     this.update('running', approved ? 'Approved. Continuing…' : 'Declined. Waiting for Copilot…');
+  }
+
+  review(request) {
+    const active = this.currentApproval(request.id);
+    const entries = active?.approval.files;
+    if (!entries) return;
+    if (request.type === 'review-open') {
+      if (!entries.some(file => file.id === request.file) || active.openDiffs.has(request.file)) return;
+      active.openDiffs.add(request.file);
+      active.transport.decide({id: request.id, open_file: request.file});
+      return;
+    }
+    const selected = new Set(request.files);
+    const files = entries.filter(file => selected.has(file.id));
+    if (files.length !== selected.size || entries.some(file => file.group != null &&
+        selected.has(file.id) !== selected.has(file.group))) {
+      throw new Error('Keep linked rename files together and select from this review.');
+    }
+    const folder = this.currentFolder().uri.fsPath;
+    const normalize = value => process.platform === 'win32' ? path.normalize(value).toLowerCase() : path.normalize(value);
+    const dirty = new Set((this.vscode.workspace.textDocuments || [])
+      .filter(document => document.isDirty && document.uri.scheme === 'file')
+      .map(document => normalize(document.uri.fsPath)));
+    const unsaved = files.find(file => dirty.has(normalize(path.join(folder, file.path))));
+    if (unsaved) throw new Error(`Save or discard unsaved edits in ${unsaved.path} before applying.`);
+    active.approval = undefined;
+    active.transport.decide({id: request.id, selected: request.files});
+    this.update('running', 'Applying the selected changes…');
   }
 
   stopChat() {
@@ -240,8 +277,24 @@ class Controller {
     if (this.active !== active || active.stopping) return;
     if (message.type === 'approval' && typeof message.id === 'string') {
       active.approval = message;
+      active.openDiffs.clear();
       this.update('running', message.source ? 'Approve source sharing to send.' :
         message.review ? 'The draft is ready to review.' : 'Review Copilot’s request below.');
+    } else if (message.type === 'review_document' && this.currentApproval(message.id) &&
+               active.openDiffs.delete(message.file)) {
+      const file = active.approval.files?.find(item => item.id === message.file);
+      if (file && typeof message.before === 'string' && typeof message.after === 'string' && this.openReviewDiff) {
+        void this.openReviewDiff(message.id, file, message).catch(() => {
+          if (this.currentApproval(message.id)) {
+            this.state = {...this.state, error: 'Could not open the VS Code diff. You can still review the inline changes.'};
+            this.publish();
+          }
+        });
+      }
+    } else if (message.type === 'review_error' && this.currentApproval(message.id)) {
+      active.openDiffs.clear();
+      this.state = {...this.state, error: message.message};
+      this.publish();
     } else if (message.type === 'session' && !active.turn) {
       active.turn = {id: message.id, user: active.user, previews: []};
       active.chat.push(active.turn);
@@ -270,7 +323,7 @@ class Controller {
       Object.assign(active.turn, {reply: result.copilot.summary, notes: result.copilot.remaining_issues,
         files: result.files_changed, checks: result.checks, dryRun: result.dry_run,
         proposed: result.proposed_files, reviewStatus: result.review_status, reasoningMode: result.reasoning_mode,
-        audit: result.audit});
+        audit: result.audit, reviewFiles: result.review_files});
       this.state.verified = true;
       this.update('finished', '', false);
       return;

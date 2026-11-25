@@ -20,11 +20,13 @@ From the PilotPatch folder in PowerShell:
 3. Open your project in VS Code, click **PilotPatch**, then **Test connection**.
    When Copilot replies, ask a question or request a change and click **Send**.
 4. Click **Share and send** if authorized. Read Copilot’s reply in the sidebar, then
-   ask a follow-up or review the draft. **Apply changes** writes the reviewed draft.
+   ask a follow-up or review the draft. Expand a file for highlighted changes, or
+   click **Open diff** to compare both versions in VS Code. **Apply** writes the
+   files you selected.
 
 PilotPatch chooses **Think Deeper** when Copilot offers it and prefers **Auto** when
 it is unavailable. With **Review and apply** selected, PilotPatch gathers relevant
-source and prepares the combined file diff before asking for approval.
+source and prepares per-file diffs before asking for approval.
 
 Ask **“Audit the codebase and suggest improvements”** for a read-only review.
 After source sharing is approved, PilotPatch sends eligible source, tests and

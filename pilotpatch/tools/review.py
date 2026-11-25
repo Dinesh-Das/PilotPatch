@@ -19,6 +19,25 @@ class Change:
     def diff(self) -> str:
         return text_diff(self.name, self.before, self.after)
 
+    def review_entry(self, index: int, limit: int, group: int | None) -> dict:
+        diff = self.diff()
+        lines = diff.splitlines()
+        edits = lines[2:] if diff.startswith("--- ") else []
+        return dict(
+            id=index,
+            path=self.name,
+            kind="added"
+            if self.before is None
+            else "deleted"
+            if self.after is None
+            else "modified",
+            added=sum(line.startswith("+") for line in edits),
+            removed=sum(line.startswith("-") for line in edits),
+            diff=diff if len(diff) <= limit else diff[:limit].rsplit("\n", 1)[0],
+            clipped=len(diff) > limit,
+            group=group,
+        )
+
 
 def text_diff(name: str, before: bytes | None, after: bytes | None) -> str:
     lines = list(
@@ -44,11 +63,33 @@ def text_diff(name: str, before: bytes | None, after: bytes | None) -> str:
     )
 
 
+def review_entries(changes: list[Change], groups: dict[int, int]) -> list[dict]:
+    limit = min(12000, 200000 // len(changes))
+    return [
+        change.review_entry(index, limit, groups.get(index)) for index, change in enumerate(changes)
+    ]
+
+
 class ReviewRepository(Repository):
     def __init__(self, original: Repository):
         super().__init__(original.root, original.config)
         self.original = original
         self.changes: dict[Path, Change] = {}
+        self.renames: dict[Path, set[Path]] = {}
+
+    def link_rename(self, source: Path, target: Path):
+        paths = self.renames.get(source, {source}) | self.renames.get(target, {target})
+        for path in paths:
+            self.renames[path] = paths
+
+    def review_groups(self, changes: list[Change]) -> dict[int, int]:
+        indices = {self.root / item.name: index for index, item in enumerate(changes)}
+        groups = {}
+        for path, index in indices.items():
+            linked = [indices[item] for item in self.renames.get(path, ()) if item in indices]
+            if len(linked) > 1:
+                groups[index] = min(linked)
+        return groups
 
     def stage(self, name: str, before: bytes | None, after: bytes | None):
         target = self.guard.resolve(name)

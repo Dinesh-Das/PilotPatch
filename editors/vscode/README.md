@@ -34,9 +34,11 @@ Read the full setup guide for troubleshooting, managed laptop checks and CLI usa
 ## Chat controls
 
 **Review and apply** is the default under **Permissions and preview**. Copilot requests
-local reads and edits as it works. When the proposed diff is ready, use **Apply changes**
-or **Discard draft**. Run verification after applying the draft. **Preview only** shows
-the diff without applying it. **Change project** appears
+local reads and edits as it works. When the draft is ready, expand each file to see
+highlighted lines or use **Open diff** for the native editor comparison. Choose
+which files to apply, or click **Discard draft**. Linked rename paths stay together.
+Run verification after applying the selected edits. **Preview only** shows per-file
+diffs for inspection. **Change project** appears
 in multi-root workspaces. **Stop message** stops the active turn. Inspect Edge and
 your project before retrying an interrupted turn.
 

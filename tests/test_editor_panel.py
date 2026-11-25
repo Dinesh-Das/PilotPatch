@@ -241,3 +241,50 @@ async def test_sidebar_identifies_partial_audit_and_reports_actual_coverage(edit
     )
     assert await page.get_by_text("Partial audit · 8 of 17 eligible files supplied").is_visible()
     assert await page.get_by_text("The audit reached the session’s step limit.").is_visible()
+
+
+@pytest.mark.browser
+async def test_file_review_highlights_changes_and_applies_only_selected_files(
+    editor_panel, tmp_path
+):
+    page, _ = editor_panel
+    review_id = "c" * 32
+    await publish(
+        page,
+        busy=True,
+        operation="chat",
+        verified=True,
+        approval=dict(
+            id=review_id,
+            review=True,
+            message="Polish the layout",
+            files=[
+                dict(
+                    id=0,
+                    path="src/site.css",
+                    kind="modified",
+                    added=1,
+                    removed=1,
+                    diff="--- a/src/site.css\n+++ b/src/site.css\n@@ -3 +3 @@\n-old\n+<new>\n",
+                ),
+                dict(id=1, path="src/site.test.js", kind="added", added=1, removed=0, diff="+test"),
+            ],
+        ),
+    )
+    assert await page.get_by_text("src/site.css", exact=True).is_visible()
+    assert await page.locator(".diff-added").get_by_text("+<new>", exact=True).is_visible()
+    assert await page.locator(".diff-removed").get_by_text("-old", exact=True).is_visible()
+    await page.get_by_role("region", name="Review changes").screenshot(path=tmp_path / "review.png")
+    await page.get_by_role("button", name="Open diff for src/site.css").click()
+    assert await page.evaluate("window.panelMessages.at(-1)") == dict(
+        type="review-open",
+        id=review_id,
+        file=0,
+    )
+    await page.get_by_role("checkbox", name="Include src/site.test.js").uncheck()
+    await page.get_by_role("button", name="Apply 1 file").click()
+    assert await page.evaluate("window.panelMessages.at(-1)") == dict(
+        type="review-apply",
+        id=review_id,
+        files=[0],
+    )

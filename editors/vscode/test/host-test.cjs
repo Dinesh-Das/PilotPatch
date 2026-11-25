@@ -24,8 +24,15 @@ exports.run = async function () {
   await api.controller.handle({type: 'connect'});
   assert.equal(await exit, 0, 'Real Python connect setup task must succeed');
   assert.equal(api.controller.state.phase, 'finished');
+  await api.controller.openReviewDiff('e'.repeat(32), {id: 0, path: 'src/sample.py'},
+    {before: 'value = 1\n', after: 'value = 2\n'});
+  const diff = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+  assert.ok(diff instanceof vscode.TabInputTextDiff, 'Review opens the native diff editor');
+  assert.equal(diff.modified.scheme, 'pilotpatch-review');
+  assert.equal((await vscode.workspace.openTextDocument(diff.original)).getText(), 'value = 1\n');
+  assert.equal((await vscode.workspace.openTextDocument(diff.modified)).getText(), 'value = 2\n');
   const report = {editor: vscode.env.appName, version: vscode.version,
-    activated: true, commandRegistered: true, connectExitCode: 0,
+    activated: true, commandRegistered: true, connectExitCode: 0, verifiedReviewDiff: true,
     phase: api.controller.state.phase, workspace: api.controller.currentFolder().uri.fsPath};
   if (process.env.PILOTPATCH_EDITOR_REPORT) fs.writeFileSync(process.env.PILOTPATCH_EDITOR_REPORT, JSON.stringify(report, null, 2));
 };
