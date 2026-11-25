@@ -72,8 +72,8 @@ accounts. Check the terms and policy for the account you intend to use. Microsof
 Copilot and GitHub Copilot are distinct services.
 [Microsoft Copilot terms](https://www.microsoft.com/en-us/microsoft-copilot/for-individuals/termsofuse)
 
-See the latest audit for what was verified locally and which checks require your actual
-office device and account. [November 24 audit](docs/audit-2026-11-24.md)
+See the office Windows audit for the confirmed setup failures and the checks that
+require your managed device and account. [Office Windows audit](docs/audit-2026-11-26.md)
 ## PowerShell coding workflow
 
 ```powershell

@@ -194,3 +194,25 @@ test('uses the registered backend and copies only paths for successful setup', a
   assert.equal(f.updates.at(-1).verified, true);
   assert.equal(f.updates.at(-1).busy, false);
 });
+
+test('offers the setup backend when a manual Python setting points elsewhere', async t => {
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'pilotpatch-editor-'));
+  t.after(() => fs.rm(home, {recursive: true, force: true}));
+  await fs.writeFile(path.join(home, 'editor-backend.json'), JSON.stringify({python: process.execPath}));
+  const f = fixture({home});
+  let manual = path.join(home, 'old', 'python.exe');
+  f.api.ConfigurationTarget = {Global: 1};
+  f.api.workspace.getConfiguration = () => ({
+    inspect: () => ({globalValue: manual, workspaceValue: 'untrusted.exe'}),
+    async update(key, value, target) {
+      assert.deepEqual([key, value, target], ['pythonPath', undefined, f.api.ConfigurationTarget.Global]);
+      manual = value;
+    },
+  });
+  await f.controller.handle({type: 'ready'});
+  assert.equal(f.updates.at(-1).backendOverride, true);
+  await f.controller.handle({type: 'use-setup-python'});
+  assert.equal(f.updates.at(-1).backendOverride, false);
+  await f.controller.handle({type: 'probe'});
+  assert.equal(f.tasks[0].task.execution.executable, process.execPath);
+});

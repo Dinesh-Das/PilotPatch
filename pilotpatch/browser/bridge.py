@@ -7,6 +7,7 @@ The pairing token authenticates the extension, not the Microsoft account.
 import asyncio
 import base64
 import binascii
+import errno
 import hashlib
 import hmac
 import json
@@ -85,6 +86,7 @@ class Bridge:
             raise ProviderError(
                 "Another PilotPatch browser task is active; leave it open or stop it"
             ) from exc
+        port = data["port"] if self.port_override is None else self.port_override
         try:
             self.connected.clear()
             self.probe_receipts = False
@@ -95,12 +97,23 @@ class Bridge:
             self.server = await asyncio.start_server(
                 self._accept,
                 "127.0.0.1",
-                data["port"] if self.port_override is None else self.port_override,
+                port,
                 limit=16384,
             )
             self.port = self.server.sockets[0].getsockname()[1]
-        except BaseException:
+        except BaseException as exc:
             self.lock.release()
+            if isinstance(exc, OSError):
+                if exc.errno in {errno.EADDRINUSE, 10048}:
+                    raise ProviderError(
+                        f"Local Edge port {port} is already in use. Stop any other PilotPatch "
+                        "task and retry. If it persists, ask IT about the port conflict."
+                    ) from exc
+                if exc.errno in {errno.EACCES, errno.EPERM, 10013}:
+                    raise ProviderError(
+                        f"Access to local Edge port {port} was denied. Check with your IT team "
+                        "whether PilotPatch can listen on the loopback interface."
+                    ) from exc
             raise
 
     async def close(self):

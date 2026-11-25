@@ -32,6 +32,10 @@ function renderPanel(webview, extensionUri, Uri) {
     <p>Run <code>setup-windows.ps1</code> from your PilotPatch folder. If you installed it manually, select the Python executable in its <code>.venv</code> folder.</p>
     <button id="configure" class="secondary">Select installed Python</button>
   </section>
+  <section id="backend-override" class="setup" hidden>
+    <p>VS Code is using a manually selected Python. Windows setup registered a different installation.</p>
+    <button id="use-setup-python" class="secondary">Use Python from Windows setup</button>
+  </section>
   <section id="connection" class="setup" aria-labelledby="setup-title" hidden>
     <h2 id="setup-title">Connect Copilot in Edge</h2>
     <p id="connect-intro">Already paired in Edge? Test your connection below. For a first install, open Edge Extensions and load the PilotPatch folder.</p>

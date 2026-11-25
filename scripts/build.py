@@ -193,6 +193,7 @@ def build_office(python, stage, index, sdist, wheel, vsix, edge_zip, target):
         }
     files.update(
         {
+            "OFFICE-BUNDLE": b"PilotPatch offline Windows installation bundle\n",
             f"dist/{wheel.name}": wheel,
             f"artifacts/{vsix.name}": vsix,
             f"artifacts/{edge_zip.name}": edge_zip,

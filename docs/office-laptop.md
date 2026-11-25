@@ -1,13 +1,13 @@
 # Can I run PilotPatch on my office laptop?
 
-The supported target is Windows 11 x64 with approved 64-bit CPython 3.11–3.13,
+The supported target is Windows 11 x64 with approved x64 CPython 3.11–3.13,
 Git, Microsoft Edge 120 or newer and a local VS Code installation for the chat panel.
 Your organization must allow the extension, the loopback connection, browser automation
 and use of the intended Microsoft Copilot account for your project.
 
 ## Install it
 
-Transfer the `PilotPatch-Office-0.5.2.zip` produced by `build.cmd` through your
+Transfer the `PilotPatch-Office-0.5.3.zip` produced by `build.cmd` through your
 approved route. Extract it to a local folder you can write to, such as
 `%LOCALAPPDATA%\Programs\PilotPatch`. The bundle contains the Python dependency wheels,
 the VSIX and the source build files. Set up a fresh environment and pairing on each laptop.
@@ -15,11 +15,15 @@ the VSIX and the source build files. Set up a fresh environment and pairing on e
 In PowerShell, from the extracted folder:
 
 ```powershell
-.\setup-windows.ps1 -InstallEditor -OpenEdgeSetup
+.\setup-windows.ps1 -InstallEditor
 ```
 
-Setup uses the included wheels and VSIX. If your editor policy requires manual installation,
-run setup without `-InstallEditor` and use the approved process to install the VSIX.
+Setup checks the bundle first and installs from the included wheels. If VS Code
+cannot install the VSIX automatically, setup prints its full path so you can
+install it through your organization's approved process. Edge setup is already
+prepared at that point. When upgrading, reload PilotPatch at `edge://extensions`.
+If the VS Code panel offers **Use Python from Windows setup**, select it to switch
+from a manually configured backend to the new installation.
 For script restrictions, see the [manual setup commands](../setup.md#2-install-the-python-backend).
 
 ## Check the actual laptop

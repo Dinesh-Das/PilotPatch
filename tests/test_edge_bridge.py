@@ -18,6 +18,17 @@ def test_default_never_constructs_or_launches_managed_edge(tmp_path):
     assert isinstance(browser_provider(tmp_path, Config()), CopilotExistingEdge)
 
 
+async def test_busy_loopback_port_reports_conflict_and_releases_lock(tmp_path):
+    async with await asyncio.start_server(
+        lambda reader, writer: writer.close(), "127.0.0.1", 0
+    ) as server:
+        port = server.sockets[0].getsockname()[1]
+        bridge = Bridge(tmp_path, port=port)
+        with pytest.raises(ProviderError, match=f"port {port} is already in use"):
+            await bridge.open()
+        assert not bridge.lock.is_locked
+
+
 async def test_shutdown_interrupts_a_pending_command_and_releases_the_browser_lock(tmp_path):
     bridge = Bridge(tmp_path, port=0)
     await bridge.open()

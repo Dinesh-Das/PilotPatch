@@ -1,6 +1,6 @@
 'use strict';
 const path = require('node:path');
-const actions = new Set(['ready', 'configure', 'workspace', 'open-folder', 'stop',
+const actions = new Set(['ready', 'configure', 'use-setup-python', 'workspace', 'open-folder', 'stop',
   'connect', 'edge-setup', 'login', 'probe', 'doctor', 'history', 'copy-extension', 'copy-pairing', 'clear-chat']);
 const modes = new Set(['approve', 'read-only', 'auto-edit']);
 const reviewId = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);

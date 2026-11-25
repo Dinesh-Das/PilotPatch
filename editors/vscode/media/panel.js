@@ -294,7 +294,7 @@
   });
   for (const input of [prompt, mode, dryRun]) input.addEventListener('input', renderDraft);
   for (const id of ['login', 'probe', 'doctor', 'workspace', 'open-folder',
-    'stop', 'configure', 'copy-extension', 'copy-pairing', 'clear-chat']) {
+    'stop', 'configure', 'use-setup-python', 'copy-extension', 'copy-pairing', 'clear-chat']) {
     element(id).addEventListener('click', () => send(id));
   }
   element('connect').addEventListener('click', () => send('edge-setup'));
@@ -323,6 +323,8 @@
     element('workspace').hidden = !allowed || !state.multiRoot;
     element('project-setup').hidden = !allowed || Boolean(state.workspace);
     element('backend-setup').hidden = !allowed || !state.workspace || state.configured;
+    element('backend-override').hidden = !canRun || !state.backendOverride;
+    element('use-setup-python').disabled = state.busy;
     element('connection').hidden = !canRun || state.verified;
     element('retest').hidden = !state.verified;
     element('connect-intro').hidden = state.prepared;

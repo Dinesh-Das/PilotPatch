@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.3 — 2026-11-26
+
+- Check the offline bundle before installing packages and report missing files by name.
+- Find VS Code in its standard Windows install locations and complete Edge setup before
+  attempting the VSIX install.
+- Show when VS Code is using a manually selected Python and offer to use the one from setup.
+- Explain loopback port conflicts and permission denials in the connection test.
+
 ## 0.5.2 — 2026-11-25
 
 - Show the selected tab, active VS Code link and last verified Copilot reply in the Edge popup.

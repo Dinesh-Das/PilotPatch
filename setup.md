@@ -2,7 +2,7 @@
 
 ## 1. Requirements and paths
 
-Use Windows 11 x64, approved 64-bit CPython 3.11–3.13, Git and Microsoft Edge 120+.
+Use Windows 11 x64, approved x64 CPython 3.11–3.13, Git and Microsoft Edge 120+.
 Use local VS Code for the prompt panel. The office guide covers device and account
 policy, portable paths and offline installation.
 [Office laptop checks](docs/office-laptop.md)
@@ -16,7 +16,7 @@ $TargetProject = 'C:\Work\YourProject'
 $PilotPatchPython = Join-Path $PilotPatchRoot '.venv\Scripts\python.exe'
 $PilotPatchCli = Join-Path $PilotPatchRoot 'copilot.cmd'
 $PilotPatchState = Join-Path $env:LOCALAPPDATA 'PilotPatch'
-$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.5.2.vsix'
+$PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.5.3.vsix'
 ```
 
 ## 2. Install the Python backend
@@ -26,11 +26,14 @@ $PilotPatchVsix = Join-Path $PilotPatchRoot 'artifacts\pilotpatch-0.5.2.vsix'
 ```
 
 This installs and checks the local Python environment, prepares the Edge files, and
-registers the backend with PilotPatch in VS Code. With `-InstallEditor`, setup builds
-the matching VSIX if needed and installs it. Use `-Python 'C:\Approved Python\python.exe'`
+registers the backend with PilotPatch in VS Code. With `-InstallEditor`, setup installs
+the matching VSIX from the bundle or builds it from a source checkout.
+Use `-Python 'C:\Approved Python\python.exe'`
 if the script cannot find the approved interpreter. Setup reuses a working environment.
 With `-OpenEdgeSetup`, setup opens Edge Extensions and copies the unpacked folder path.
 If the environment was copied from another laptop, move it aside and rerun setup.
+If the editor shows a manually selected Python, **Use Python from Windows setup**
+switches to the registered installation.
 
 For manual installation under workplace script restrictions:
 
@@ -47,7 +50,7 @@ online pip steps:
 ```powershell
 $PilotPatchWheels = Join-Path $PilotPatchRoot 'wheelhouse'
 & $PilotPatchPython -I -m pip install --no-index --find-links $PilotPatchWheels --only-binary=:all: -r (Join-Path $PilotPatchRoot 'requirements.txt')
-& $PilotPatchPython -I -m pip install --no-index --no-deps (Join-Path $PilotPatchRoot 'dist\pilotpatch-0.5.2-py3-none-any.whl')
+& $PilotPatchPython -I -m pip install --no-index --no-deps (Join-Path $PilotPatchRoot 'dist\pilotpatch-0.5.3-py3-none-any.whl')
 ```
 
 If you installed manually, use **Extensions → … → Install from VSIX…** in VS Code

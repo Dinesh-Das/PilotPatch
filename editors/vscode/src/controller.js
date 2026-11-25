@@ -42,16 +42,21 @@ class Controller {
     ];
   }
 
-  python() {
+  configuredPython() {
     // Workspace settings are untrusted and must never select an executable.
-    const configured = this.vscode.workspace.getConfiguration('pilotpatch').inspect('pythonPath')?.globalValue;
-    if (configured) return configured;
+    const value = this.vscode.workspace.getConfiguration('pilotpatch').inspect('pythonPath')?.globalValue;
+    return typeof value === 'string' ? value : '';
+  }
+
+  registeredPython() {
     try {
       const registration = path.join(this.home, 'editor-backend.json');
       const python = JSON.parse(readFileSync(registration, 'utf8')).python;
       return typeof python === 'string' && path.isAbsolute(python) ? python : '';
     } catch { return ''; }
   }
+
+  python() { return this.configuredPython() || this.registeredPython(); }
 
   currentFolder() {
     const folders = this.vscode.workspace.workspaceFolders || [];
@@ -61,11 +66,14 @@ class Controller {
   publish() {
     const folder = this.currentFolder();
     const key = folder?.uri.toString();
+    const configured = this.configuredPython();
+    const registered = this.registeredPython();
     this.notify({...this.state, workspace: folder?.name || '', project: folder?.uri.fsPath || '',
       operation: this.active?.type,
       chat: this.chats.get(key) || [], approval: this.active?.key === key ? this.active?.approval : undefined,
       multiRoot: (this.vscode.workspace.workspaceFolders || []).length > 1,
-      configured: Boolean(this.python()), trusted: this.vscode.workspace.isTrusted,
+      configured: Boolean(configured || registered), trusted: this.vscode.workspace.isTrusted,
+      backendOverride: Boolean(configured && registered && path.relative(configured, registered)),
       remote: Boolean(this.vscode.env.remoteName)});
   }
 
@@ -98,6 +106,24 @@ class Controller {
     }
   }
 
+  async useSetupPython() {
+    if (!this.vscode.workspace.isTrusted || this.vscode.env.remoteName) {
+      throw new Error('Open a trusted local editor window to select Python.');
+    }
+    this.update('preparing', 'Switching to the Python registered by Windows setup…', true);
+    try {
+      const registered = this.registeredPython();
+      const file = registered && await fs.stat(registered).catch(() => undefined);
+      if (!file || !file.isFile()) throw new Error('Run Windows setup to register a working backend.');
+      await this.vscode.workspace.getConfiguration('pilotpatch').update(
+        'pythonPath', undefined, this.vscode.ConfigurationTarget.Global);
+      this.state.prepared = this.state.verified = false;
+      this.update('finished', 'Using the Python registered by Windows setup.', false);
+    } catch (error) {
+      this.update('error', error.message, false);
+    }
+  }
+
   async chooseWorkspace() {
     const folders = this.vscode.workspace.workspaceFolders || [];
     if (!folders.length) throw new Error('Open a local project folder in the editor first.');
@@ -121,11 +147,12 @@ class Controller {
         this.chats.delete(this.currentFolder()?.uri.toString());
         return this.update('idle', 'Conversation cleared in VS Code. For a fresh Copilot chat, start one in Edge.');
       }
-      if (this.state.busy && ['configure', 'workspace', 'open-folder'].includes(request.type)) {
+      if (this.state.busy && ['configure', 'use-setup-python', 'workspace', 'open-folder'].includes(request.type)) {
         throw new Error('Wait for the current task before changing its workspace or backend.');
       }
       if (request.type === 'open-folder') return await this.vscode.commands.executeCommand('vscode.openFolder');
       if (request.type === 'configure') return await this.configure();
+      if (request.type === 'use-setup-python') return await this.useSetupPython();
       if (request.type === 'workspace') return await this.chooseWorkspace();
       if (request.type === 'copy-extension' || request.type === 'copy-pairing') {
         if (this.state.busy) throw new Error('Wait for the current task before changing Edge setup.');
